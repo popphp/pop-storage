@@ -1,0 +1,50 @@
+{
+    "name": "popphp/pop-storage",
+    "description": "Pop Storage Component for Pop PHP Framework",
+    "keywords": [
+        "storage",
+        "file storage",
+        "aws s3",
+        "azure blob",
+        "php",
+        "pop",
+        "pop php"
+    ],
+    "homepage": "http://www.popphp.org/",
+    "license": "BSD-3-Clause",
+    "authors": [
+        {
+            "name": "Nick Sagona",
+            "email": "dev@nolainteractive.com",
+            "homepage": "http://www.nolainteractive.com/"
+        }
+    ],
+    "require": {
+        "php": ">=7.3.0",
+        "popphp/pop-dir": "^3.2.0",
+        "popphp/pop-http": "^4.1.0",
+        "aws/aws-sdk-php": "^3.216.4",
+        "microsoft/azure-storage-blob": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.0.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Pop\\Storage\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Pop\\Storage\\Test\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "0.0.x-dev"
+        }
+    }
+}
