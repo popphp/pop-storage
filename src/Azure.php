@@ -13,7 +13,7 @@
  */
 namespace Pop\Storage;
 
-use Aws\S3\S3Client;
+use MicrosoftAzure\Storage\Blob\BlobRestProxy;
 use Pop\Http\Server\Upload;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -53,7 +53,7 @@ class Azure extends AbstractAdapter
      * Set Azure Blob client
      *
      * @param  BlobRestProxy $client
-     * @return S3
+     * @return Azure
      */
     public function setClient(BlobRestProxy $client)
     {
