@@ -61,13 +61,22 @@ interface AdapterInterface
     /**
      * Upload file
      *
-     * @param  array   $file
+     * @param  mixed   $file
+     * @param  string  $folder
      * @param  Upload  $upload
-     * @param  string  $to
-     * @param  boolean $secure
      * @return string
      */
-    public function uploadFile(array $file, Upload $upload, $to = null, $secure = true);
+    public function uploadFile($file, $folder = null, Upload $upload = null);
+
+    /**
+     * Upload file
+     *
+     * @param  string  $fileStream
+     * @param  string  $filename
+     * @param  string  $folder
+     * @return string
+     */
+    public function uploadFileStream($fileStream, $filename, $folder = null);
 
     /**
      * Replace file

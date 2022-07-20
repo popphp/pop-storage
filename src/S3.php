@@ -75,22 +75,40 @@ class S3 extends AbstractAdapter
     /**
      * Upload file
      *
-     * @param  array   $file
+     * @param  mixed   $file
+     * @param  string  $folder
      * @param  Upload  $upload
-     * @param  string  $to
-     * @param  boolean $secure
      * @return string
      */
-    public function uploadFile(array $file, Upload $upload, $to = null, $secure = true)
+    public function uploadFile($file, $folder = null, Upload $upload = null)
     {
-        if ($upload->test($file)) {
+        if (is_array($file) && isset($file['name']) && isset($file['tmp_name']) && (null !== $upload) && ($upload->test($file))) {
             $filename = $upload->checkFilename($file['name']);
-            $location = $this->location . $to . '/' . $filename;
+            $location = $this->location . $folder . '/' . $filename;
             file_put_contents($location, file_get_contents($file['tmp_name']));
             return $filename;
+        } else if (is_file($file)) {
+            $location = $this->location . $folder . '/' . $file;
+            file_put_contents($location, file_get_contents($file));
+            return $file;
         } else {
             return false;
         }
+    }
+
+    /**
+     * Upload file
+     *
+     * @param  string  $fileStream
+     * @param  string  $filename
+     * @param  string  $folder
+     * @return string
+     */
+    public function uploadFileStream($fileStream, $filename, $folder = null)
+    {
+        $location = $this->location . $folder . '/' . $filename;
+        file_put_contents($location, file_get_contents($filename));
+        return $filename;
     }
 
     /**
