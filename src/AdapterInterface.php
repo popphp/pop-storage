@@ -62,11 +62,11 @@ interface AdapterInterface
      * Upload file
      *
      * @param  mixed   $file
-     * @param  string  $folder
+     * @param  string  $dest
      * @param  Upload  $upload
      * @return string
      */
-    public function uploadFile($file, $folder = null, Upload $upload = null);
+    public function uploadFile($file, $dest = null, Upload $upload = null);
 
     /**
      * Upload file

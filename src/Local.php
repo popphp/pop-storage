@@ -38,15 +38,36 @@ class Local extends AbstractAdapter
     /**
      * Upload file
      *
-     * @param  array   $file
+     * @param  mixed   $file
+     * @param  string  $dest
      * @param  Upload  $upload
-     * @param  string  $to
      * @param  boolean $secure
      * @return string
      */
-    public function uploadFile(array $file, Upload $upload, $to = null, $secure = true)
+    public function uploadFile($file, $dest = null, Upload $upload = null, $secure = true)
     {
-        return $upload->upload($file, $to, $secure);
+        if (!is_array($file)) {
+            throw new Exception('Error: The file parameter must be an array.');
+        }
+        return $upload->upload($file, $dest, $secure);
+    }
+
+    /**
+     * Upload file stream
+     *
+     * @param  string  $fileStream
+     * @param  string  $filename
+     * @param  string  $folder
+     * @return string
+     */
+    public function uploadFileStream($fileStream, $filename, $folder = null)
+    {
+        if (!file_exists($this->location . $folder)) {
+            $this->mkdir($folder);
+        }
+        $location = $this->location . $folder . '/' . $filename;
+        file_put_contents($location, $fileStream);
+        return $filename;
     }
 
     /**

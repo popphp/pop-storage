@@ -98,14 +98,14 @@ abstract class AbstractAdapter implements AdapterInterface
      * Upload file
      *
      * @param  mixed   $file
-     * @param  string  $folder
+     * @param  string  $dest
      * @param  Upload  $upload
      * @return string
      */
-    abstract public function uploadFile($file, $folder = null, Upload $upload = null);
+    abstract public function uploadFile($file, $dest = null, Upload $upload = null);
 
     /**
-     * Upload file
+     * Upload file stream
      *
      * @param  string  $fileStream
      * @param  string  $filename
@@ -255,9 +255,6 @@ abstract class AbstractAdapter implements AdapterInterface
     {
         if (!file_exists($filename)) {
             $filename = $this->location . $filename;
-        }
-        if (!file_exists($filename)) {
-            throw new Exception("Error: The file '" . $filename . "' does not exist.");
         }
         return file($this->checkFileLocation($filename));
     }
