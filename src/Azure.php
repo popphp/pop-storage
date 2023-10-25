@@ -13,7 +13,7 @@
  */
 namespace Pop\Storage;
 
-use MicrosoftAzure\Storage\Blob\BlobRestProxy;
+use Pop\Http\Client;
 use Pop\Http\Server\Upload;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -32,18 +32,18 @@ class Azure extends AbstractAdapter
 {
 
     /**
-     * Azure Blob client
-     * @var ?BlobRestProxy
+     * Azure HTTP client
+     * @var ?Client
      */
-    protected ?BlobRestProxy $client = null;
+    protected ?Client $client = null;
 
     /**
      * Constructor
      *
-     * @param string        $location
-     * @param BlobRestProxy $client
+     * @param string $location
+     * @param Client $client
      */
-    public function __construct(string $location, BlobRestProxy $client)
+    public function __construct(string $location, Client $client)
     {
         parent::__construct($location);
         $this->setClient($client);
@@ -52,10 +52,10 @@ class Azure extends AbstractAdapter
     /**
      * Set Azure Blob client
      *
-     * @param  BlobRestProxy $client
+     * @param  Client $client
      * @return Azure
      */
-    public function setClient(BlobRestProxy $client): Azure
+    public function setClient(Client $client): Azure
     {
         $this->client = $client;
         return $this;
@@ -64,9 +64,9 @@ class Azure extends AbstractAdapter
     /**
      * Get Azure Blob client
      *
-     * @return ?BlobRestProxy
+     * @return ?Client
      */
-    public function getClient(): ?BlobRestProxy
+    public function getClient(): ?Client
     {
         return $this->client;
     }
