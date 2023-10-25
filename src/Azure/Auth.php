@@ -240,8 +240,7 @@ class Auth
      */
     public function signRequest(Request $request): Request
     {
-        $requestHeaders = self::formatHeaders($request->getHeadersAsArray());
-        $query          = [];
+        $query = [];
 
         if ($request->hasQuery()) {
             parse_str($request->getQuery(), $query);
