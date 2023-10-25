@@ -41,6 +41,12 @@ abstract class AbstractAdapter implements AdapterInterface
     protected ?string $location = null;
 
     /**
+     * Storage base location
+     * @var ?string
+     */
+    protected ?string $baseLocation = null;
+
+    /**
      * Constructor
      *
      * @param string $location
@@ -68,7 +74,8 @@ abstract class AbstractAdapter implements AdapterInterface
      */
     public function setLocation(string $location): AbstractAdapter
     {
-        $this->location = $location;
+        $this->baseLocation = $location;
+        $this->location     = $location;
         return $this;
     }
 
@@ -81,6 +88,20 @@ abstract class AbstractAdapter implements AdapterInterface
     {
         return $this->location;
     }
+
+    /**
+     * List directories
+     *
+     * @return array
+     */
+    abstract public function listDirs(): array;
+
+    /**
+     * List files
+     *
+     * @return array
+     */
+    abstract public function listFiles(): array;
 
     /**
      * Fetch file
@@ -140,6 +161,14 @@ abstract class AbstractAdapter implements AdapterInterface
             unlink($this->checkFileLocation($filename));
         }
     }
+
+    /**
+     * Change directory (location)
+     *
+     * @param  ?string $dir
+     * @return void
+     */
+    abstract public function chdir(?string $dir = null): void;
 
     /**
      * Remove a directory

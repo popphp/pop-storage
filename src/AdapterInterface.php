@@ -51,6 +51,20 @@ interface AdapterInterface
     public function getLocation(): ?string;
 
     /**
+     * List directories
+     *
+     * @return array
+     */
+    public function listDirs(): array;
+
+    /**
+     * List files
+     *
+     * @return array
+     */
+    public function listFiles(): array;
+
+    /**
      * Fetch file
      *
      * @param  string $filename
@@ -94,6 +108,14 @@ interface AdapterInterface
      * @return void
      */
     public function deleteFile(string $filename): void;
+
+    /**
+     * Change directory (location)
+     *
+     * @param  ?string $dir
+     * @return void
+     */
+    public function chdir(?string $dir = null): void;
 
     /**
      * Remove a directory

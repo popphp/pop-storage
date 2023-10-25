@@ -73,6 +73,16 @@ class S3 extends AbstractAdapter
     }
 
     /**
+     * Has S3 client
+     *
+     * @return bool
+     */
+    public function hasClient(): bool
+    {
+        return ($this->client !== null);
+    }
+
+    /**
      * Upload file
      *
      * @param  mixed   $file

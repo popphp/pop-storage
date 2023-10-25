@@ -36,6 +36,34 @@ class Local extends AbstractAdapter
     protected bool $local = true;
 
     /**
+     * List directories
+     *
+     * @return array
+     */
+    public function listDirs(): array
+    {
+        $location = $this->location;
+        return array_values(array_filter(scandir($location), function($value) use ($location) {
+            return (($value != '.') && ($value != '..') && file_exists($location . DIRECTORY_SEPARATOR . $value) &&
+                is_dir($location . DIRECTORY_SEPARATOR . $value));
+        }));
+    }
+
+    /**
+     * List files
+     *
+     * @return array
+     */
+    public function listFiles(): array
+    {
+        $location = $this->location;
+        return array_values(array_filter(scandir($location), function($value) use ($location) {
+            return (($value != '.') && ($value != '..') && file_exists($location . DIRECTORY_SEPARATOR . $value) &&
+                !is_dir($location . DIRECTORY_SEPARATOR . $value) && is_file($location . DIRECTORY_SEPARATOR . $value));
+        }));
+    }
+
+    /**
      * Upload file
      *
      * @param  mixed   $file
@@ -69,6 +97,32 @@ class Local extends AbstractAdapter
         $location = $this->location . $folder . '/' . $filename;
         file_put_contents($location, $fileStream);
         return $filename;
+    }
+
+    /**
+     * Change directory (location)
+     *
+     * @param  ?string $dir
+     * @throws Exception
+     * @return void
+     */
+    public function chdir(?string $dir = null): void
+    {
+        if (empty($dir)) {
+            $this->location = $this->baseLocation;
+        } else {
+            if (str_starts_with($dir, '/') || str_starts_with($dir, '\\')) {
+                $dir = substr($dir, 1);
+            } else if (str_starts_with($dir, './') || str_starts_with($dir, '.\\')) {
+                $dir = substr($dir, 2);
+            }
+
+            if (!file_exists($this->location . DIRECTORY_SEPARATOR . $dir)) {
+                throw new Exception('Error: That folder does not exist');
+            }
+            $this->location .= DIRECTORY_SEPARATOR . $dir;
+
+        }
     }
 
     /**
