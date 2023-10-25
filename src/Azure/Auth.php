@@ -240,14 +240,14 @@ class Auth
      */
     public function signRequest(Request $request): Request
     {
-        $query = [];
-
-        if ($request->hasQuery()) {
-            parse_str($request->getQuery(), $query);
-        }
+//        $query = [];
+//
+//        if ($request->hasQuery()) {
+//            parse_str($request->getQuery(), $query);
+//        }
 
         $signedKey = $this->getAuthorizationHeader(
-            self::formatHeaders($request->getHeadersAsArray()), $request->getUriAsString(), $query, $request->getMethod()
+            self::formatHeaders($request->getHeadersAsArray()), $request->getUriAsString(), $request->getQuery(), $request->getMethod()
         );
 
         return $request->addHeader('authorization', $signedKey);
