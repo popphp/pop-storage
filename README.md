@@ -18,6 +18,13 @@ Install `pop-storage` using Composer.
 
     composer require popphp/pop-storage
 
+Or, require it in your composer.json file
+
+    "require": {
+        "popphp/pop-storage" : "^2.0.0"
+    }
+
+
 BASIC USAGE
 -----------
 

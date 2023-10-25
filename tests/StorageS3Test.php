@@ -138,7 +138,7 @@ class StorageS3Test extends TestCase
      */
     public function testBadUpload()
     {
-        $this->assertFalse($this->s3->uploadFile(__DIR__ . '/tmp/bad-upload.txt'));
+        $this->assertEmpty($this->s3->uploadFile(__DIR__ . '/tmp/bad-upload.txt'));
     }
 
     /**

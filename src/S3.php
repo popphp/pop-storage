@@ -4,7 +4,7 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@nolainteractive.com>
- * @copyright  Copyright (c) 2009-2023 NOLA Interactive, LLC. (http://www.nolainteractive.com)
+ * @copyright  Copyright (c) 2009-2024 NOLA Interactive, LLC. (http://www.nolainteractive.com)
  * @license    http://www.popphp.org/license     New BSD License
  */
 
@@ -24,18 +24,18 @@ use RecursiveIteratorIterator;
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@nolainteractive.com>
- * @copyright  Copyright (c) 2009-2023 NOLA Interactive, LLC. (http://www.nolainteractive.com)
+ * @copyright  Copyright (c) 2009-2024 NOLA Interactive, LLC. (http://www.nolainteractive.com)
  * @license    http://www.popphp.org/license     New BSD License
- * @version    1.0.1
+ * @version    2.0.0
  */
 class S3 extends AbstractAdapter
 {
 
     /**
      * S3 client
-     * @var S3Client
+     * @var ?S3Client
      */
-    protected $client = null;
+    protected ?S3Client $client = null;
 
     /**
      * Constructor
@@ -43,7 +43,7 @@ class S3 extends AbstractAdapter
      * @param string   $location
      * @param S3Client $client
      */
-    public function __construct($location, S3Client $client)
+    public function __construct(string $location, S3Client $client)
     {
         parent::__construct($location);
         $this->setClient($client);
@@ -55,7 +55,7 @@ class S3 extends AbstractAdapter
      * @param  S3Client $client
      * @return S3
      */
-    public function setClient(S3Client $client)
+    public function setClient(S3Client $client): S3
     {
         $this->client = $client;
         $this->client->registerStreamWrapper();
@@ -65,9 +65,9 @@ class S3 extends AbstractAdapter
     /**
      * Get S3 client
      *
-     * @return S3Client
+     * @return ?S3Client
      */
-    public function getClient()
+    public function getClient(): ?S3Client
     {
         return $this->client;
     }
@@ -76,13 +76,13 @@ class S3 extends AbstractAdapter
      * Upload file
      *
      * @param  mixed   $file
-     * @param  string  $dest
-     * @param  Upload  $upload
-     * @return string|bool
+     * @param  ?string $dest
+     * @param  ?Upload $upload
+     * @return string
      */
-    public function uploadFile($file, $dest = null, Upload $upload = null)
+    public function uploadFile(mixed $file, ?string $dest = null, ?Upload $upload = null): string
     {
-        if (is_array($file) && isset($file['name']) && isset($file['tmp_name']) && (null !== $upload) && ($upload->test($file))) {
+        if (is_array($file) && isset($file['name']) && isset($file['tmp_name']) && ($upload !== null) && ($upload->test($file))) {
             $filename = $upload->checkFilename($file['name']);
             $location = $this->location . $dest . '/' . $filename;
             file_put_contents($location, file_get_contents($file['tmp_name']));
@@ -92,7 +92,7 @@ class S3 extends AbstractAdapter
             file_put_contents($location, file_get_contents($file));
             return $file;
         } else {
-            return false;
+            return '';
         }
     }
 
@@ -101,10 +101,10 @@ class S3 extends AbstractAdapter
      *
      * @param  string  $fileStream
      * @param  string  $filename
-     * @param  string  $folder
+     * @param  ?string $folder
      * @return string
      */
-    public function uploadFileStream($fileStream, $filename, $folder = null)
+    public function uploadFileStream(string $fileStream, string $filename, ?string $folder = null): string
     {
         $location = $this->location . $folder . '/' . $filename;
         file_put_contents($location, $fileStream);
@@ -117,7 +117,7 @@ class S3 extends AbstractAdapter
      * @param  string $dir
      * @return void
      */
-    public function rmdir($dir)
+    public function rmdir(string $dir): void
     {
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($this->location . $dir, RecursiveDirectoryIterator::SKIP_DOTS),
@@ -141,9 +141,9 @@ class S3 extends AbstractAdapter
      * @param  string $dir
      * @return void
      */
-    public function mkdir($dir)
+    public function mkdir(string $dir): void
     {
-        if (substr($dir, 0, 1) == '/') {
+        if (str_starts_with($dir, '/')) {
             $dir = substr($dir, 1);
         }
         $this->client->putObject([
@@ -159,9 +159,9 @@ class S3 extends AbstractAdapter
      * @param  string $filename
      * @return string
      */
-    public function md5File($filename)
+    public function md5File(string $filename): string
     {
-        if (substr($filename, 0, 1) == '/') {
+        if (str_starts_with($filename, '/')) {
             $filename = substr($filename, 1);
         }
         $fileObject = $this->client->getObject([

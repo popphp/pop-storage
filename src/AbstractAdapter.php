@@ -4,7 +4,7 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@nolainteractive.com>
- * @copyright  Copyright (c) 2009-2023 NOLA Interactive, LLC. (http://www.nolainteractive.com)
+ * @copyright  Copyright (c) 2009-2024 NOLA Interactive, LLC. (http://www.nolainteractive.com)
  * @license    http://www.popphp.org/license     New BSD License
  */
 
@@ -13,7 +13,6 @@
  */
 namespace Pop\Storage;
 
-use Pop\Storage\Exception;
 use Pop\Http\Server\Upload;
 
 /**
@@ -22,31 +21,31 @@ use Pop\Http\Server\Upload;
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@nolainteractive.com>
- * @copyright  Copyright (c) 2009-2023 NOLA Interactive, LLC. (http://www.nolainteractive.com)
+ * @copyright  Copyright (c) 2009-2024 NOLA Interactive, LLC. (http://www.nolainteractive.com)
  * @license    http://www.popphp.org/license     New BSD License
- * @version    1.0.1
+ * @version    2.0.0
  */
 abstract class AbstractAdapter implements AdapterInterface
 {
 
     /**
      * Is local flag
-     * @var boolean
+     * @var bool
      */
-    protected $local = false;
+    protected bool $local = false;
 
     /**
      * Storage location
-     * @var string
+     * @var ?string
      */
-    protected $location = null;
+    protected ?string $location = null;
 
     /**
      * Constructor
      *
      * @param string $location
      */
-    public function __construct($location)
+    public function __construct(string $location)
     {
         $this->setLocation($location);
     }
@@ -54,9 +53,9 @@ abstract class AbstractAdapter implements AdapterInterface
     /**
      * Is storage local
      *
-     * @return boolean
+     * @return bool
      */
-    public function isLocal()
+    public function isLocal(): bool
     {
         return $this->local;
     }
@@ -67,7 +66,7 @@ abstract class AbstractAdapter implements AdapterInterface
      * @param  string $location
      * @return AbstractAdapter
      */
-    public function setLocation($location)
+    public function setLocation(string $location): AbstractAdapter
     {
         $this->location = $location;
         return $this;
@@ -76,9 +75,9 @@ abstract class AbstractAdapter implements AdapterInterface
     /**
      * Get storage location
      *
-     * @return string
+     * @return ?string
      */
-    public function getLocation()
+    public function getLocation(): ?string
     {
         return $this->location;
     }
@@ -86,10 +85,11 @@ abstract class AbstractAdapter implements AdapterInterface
     /**
      * Fetch file
      *
-     * @param  string $filename
-     * @return string
+     * @param string $filename
+     * @throws Exception
+     * @return string|bool
      */
-    public function fetchFile($filename)
+    public function fetchFile(string $filename): string|bool
     {
         return file_get_contents($this->checkFileLocation($filename));
     }
@@ -98,30 +98,31 @@ abstract class AbstractAdapter implements AdapterInterface
      * Upload file
      *
      * @param  mixed   $file
-     * @param  string  $dest
-     * @param  Upload  $upload
+     * @param  ?string $dest
+     * @param  ?Upload $upload
      * @return string
      */
-    abstract public function uploadFile($file, $dest = null, Upload $upload = null);
+    abstract public function uploadFile(mixed $file, ?string $dest = null, ?Upload $upload = null): string;
 
     /**
      * Upload file stream
      *
      * @param  string  $fileStream
      * @param  string  $filename
-     * @param  string  $folder
+     * @param  ?string $folder
      * @return string
      */
-    abstract public function uploadFileStream($fileStream, $filename, $folder = null);
+    abstract public function uploadFileStream(string $fileStream, string $filename, ?string $folder = null): string;
 
     /**
      * Replace file
      *
      * @param  string $filename
      * @param  string $contents
+     * @throws Exception
      * @return void
      */
-    public function replaceFile($filename, $contents)
+    public function replaceFile(string $filename, string $contents): void
     {
         file_put_contents($this->checkFileLocation($filename), $contents);
     }
@@ -130,9 +131,10 @@ abstract class AbstractAdapter implements AdapterInterface
      * Delete
      *
      * @param  string $filename
+     * @throws Exception
      * @return void
      */
-    public function deleteFile($filename)
+    public function deleteFile(string $filename): void
     {
         if ($this->fileExists($filename)) {
             unlink($this->checkFileLocation($filename));
@@ -145,7 +147,7 @@ abstract class AbstractAdapter implements AdapterInterface
      * @param  string $dir
      * @return void
      */
-    abstract public function rmdir($dir);
+    abstract public function rmdir(string $dir): void;
 
     /**
      * Make a directory
@@ -153,16 +155,17 @@ abstract class AbstractAdapter implements AdapterInterface
      * @param  string $dir
      * @return void
      */
-    abstract public function mkdir($dir);
+    abstract public function mkdir(string $dir): void;
 
     /**
      * Copy file
      *
      * @param  string $filename
      * @param  string $to
+     * @throws Exception
      * @return void
      */
-    public function copyFile($filename, $to)
+    public function copyFile(string $filename, string $to): void
     {
         copy($this->checkFileLocation($filename), $this->location . $to);
     }
@@ -172,9 +175,10 @@ abstract class AbstractAdapter implements AdapterInterface
      *
      * @param  string $filename
      * @param  string $to
+     * @throws Exception
      * @return void
      */
-    public function renameFile($filename, $to)
+    public function renameFile(string $filename, string $to): void
     {
         rename($this->checkFileLocation($filename), $this->location . $to);
     }
@@ -183,9 +187,9 @@ abstract class AbstractAdapter implements AdapterInterface
      * File exists
      *
      * @param  string $filename
-     * @return boolean
+     * @return bool
      */
-    public function fileExists($filename)
+    public function fileExists(string $filename): bool
     {
         if (!file_exists($filename)) {
             $filename = $this->location . $filename;
@@ -197,9 +201,10 @@ abstract class AbstractAdapter implements AdapterInterface
      * Check if file is a file
      *
      * @param  string $filename
-     * @return boolean
+     * @throws Exception
+     * @return bool
      */
-    public function isFile($filename)
+    public function isFile(string $filename): bool
     {
         return is_file($this->checkFileLocation($filename));
     }
@@ -208,9 +213,10 @@ abstract class AbstractAdapter implements AdapterInterface
      * Get file size
      *
      * @param  string $filename
-     * @return int
+     * @throws Exception
+     * @return int|bool
      */
-    public function getFileSize($filename)
+    public function getFileSize(string $filename): int|bool
     {
         return filesize($this->checkFileLocation($filename));
     }
@@ -219,9 +225,10 @@ abstract class AbstractAdapter implements AdapterInterface
      * Get file type
      *
      * @param  string $filename
-     * @return string
+     * @throws Exception
+     * @return string|bool
      */
-    public function getFileType($filename)
+    public function getFileType(string $filename): string|bool
     {
         return filetype($this->checkFileLocation($filename));
     }
@@ -230,9 +237,10 @@ abstract class AbstractAdapter implements AdapterInterface
      * Get file modified time
      *
      * @param  string $filename
-     * @return int
+     * @throws Exception
+     * @return int|bool
      */
-    public function getFileMTime($filename)
+    public function getFileMTime(string $filename): int|bool
     {
         return filemtime($this->checkFileLocation($filename));
     }
@@ -243,15 +251,16 @@ abstract class AbstractAdapter implements AdapterInterface
      * @param  string $filename
      * @return string
      */
-    abstract public function md5File($filename);
+    abstract public function md5File(string $filename): string;
 
     /**
      * Load file lines into array
      *
      * @param  string $filename
+     * @throws Exception
      * @return array
      */
-    public function loadFile($filename)
+    public function loadFile(string $filename): array
     {
         if (!file_exists($filename)) {
             $filename = $this->location . $filename;
@@ -266,7 +275,7 @@ abstract class AbstractAdapter implements AdapterInterface
      * @throws Exception
      * @return string
      */
-    protected function checkFileLocation($filename)
+    protected function checkFileLocation(string $filename): string
     {
         if (!file_exists($filename)) {
             $filename = $this->location . $filename;

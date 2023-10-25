@@ -4,7 +4,7 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@nolainteractive.com>
- * @copyright  Copyright (c) 2009-2024 NOLA Interactive, LLC. (http://www.nolainteractive.com)
+ * @copyright  Copyright (c) 2009-2023 NOLA Interactive, LLC. (http://www.nolainteractive.com)
  * @license    http://www.popphp.org/license     New BSD License
  */
 
@@ -13,27 +13,63 @@
  */
 namespace Pop\Storage;
 
-use Pop\Dir\Dir;
+use MicrosoftAzure\Storage\Blob\BlobRestProxy;
 use Pop\Http\Server\Upload;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 
 /**
- * Local storage adapter class
+ * Azure storage adapter class
  *
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@nolainteractive.com>
- * @copyright  Copyright (c) 2009-2024 NOLA Interactive, LLC. (http://www.nolainteractive.com)
+ * @copyright  Copyright (c) 2009-2023 NOLA Interactive, LLC. (http://www.nolainteractive.com)
  * @license    http://www.popphp.org/license     New BSD License
- * @version    2.0.0
+ * @version    1.0.0
  */
-class Local extends AbstractAdapter
+class Azure extends AbstractAdapter
 {
 
     /**
-     * Is local flag
-     * @var bool
+     * Azure Blob client
+     * @var ?BlobRestProxy
      */
-    protected bool $local = true;
+    protected ?BlobRestProxy $client = null;
+
+    /**
+     * Constructor
+     *
+     * @param string        $location
+     * @param BlobRestProxy $client
+     */
+    public function __construct(string $location, BlobRestProxy $client)
+    {
+        parent::__construct($location);
+        $this->setClient($client);
+    }
+
+    /**
+     * Set Azure Blob client
+     *
+     * @param  BlobRestProxy $client
+     * @return Azure
+     */
+    public function setClient(BlobRestProxy $client): Azure
+    {
+        $this->client = $client;
+        return $this;
+    }
+
+    /**
+     * Get Azure Blob client
+     *
+     * @return ?BlobRestProxy
+     */
+    public function getClient(): ?BlobRestProxy
+    {
+        return $this->client;
+    }
 
     /**
      * Upload file
@@ -41,16 +77,11 @@ class Local extends AbstractAdapter
      * @param  mixed   $file
      * @param  ?string $dest
      * @param  ?Upload $upload
-     * @param  bool    $secure
-     * @throws Exception
      * @return string
      */
-    public function uploadFile(mixed $file, ?string $dest = null, ?Upload $upload = null, bool $secure = true): string
+    public function uploadFile(mixed $file, ?string $dest = null, ?Upload $upload = null): string
     {
-        if (!is_array($file)) {
-            throw new Exception('Error: The file parameter must be an array.');
-        }
-        return $upload->upload($file, $dest, $secure);
+        return '';
     }
 
     /**
@@ -63,25 +94,18 @@ class Local extends AbstractAdapter
      */
     public function uploadFileStream(string $fileStream, string $filename, ?string $folder = null): string
     {
-        if (!file_exists($this->location . $folder)) {
-            $this->mkdir($folder);
-        }
-        $location = $this->location . $folder . '/' . $filename;
-        file_put_contents($location, $fileStream);
-        return $filename;
+        return '';
     }
 
     /**
      * Remove a directory
      *
-     * @param string $dir
-     * @throws \Pop\Dir\Exception
+     * @param  string $dir
      * @return void
      */
     public function rmdir(string $dir): void
     {
-        $dir = new Dir($this->location . $dir);
-        $dir->emptyDir(true);
+
     }
 
     /**
@@ -92,19 +116,18 @@ class Local extends AbstractAdapter
      */
     public function mkdir(string $dir): void
     {
-        mkdir($this->location . $dir);
+
     }
 
     /**
      * Create MD5 checksum of the file
      *
      * @param  string $filename
-     * @throws Exception
      * @return string
      */
     public function md5File(string $filename): string
     {
-        return md5_file($this->checkFileLocation($filename));
+        return '';
     }
 
 }
