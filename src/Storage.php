@@ -26,4 +26,258 @@ namespace Pop\Storage;
 class Storage extends AbstractStorage
 {
 
+    /**
+     * Set base directory
+     *
+     * @param  ?string $directory
+     * @return void
+     */
+    public function setBaseDir(?string $directory = null): void
+    {
+        $this->adapter->setBaseDir($directory);
+    }
+
+    /**
+     * Get base directory
+     *
+     * @return ?string
+     */
+    public function getBaseDir(): ?string
+    {
+        return $this->adapter->getBaseDir();
+    }
+
+    /**
+     * Get current directory
+     *
+     * @return ?string
+     */
+    public function getCurrentDir(): ?string
+    {
+        return $this->adapter->getCurrentDir();
+    }
+
+    /**
+     * Change directory
+     *
+     * @param  ?string $directory
+     * @return void
+     */
+    public function chdir(?string $directory = null): void
+    {
+        $this->adapter->chdir($directory);
+    }
+
+    /**
+     * Make directory
+     *
+     * @param  string $directory
+     * @return void
+     */
+    public function mkdir(string $directory): void
+    {
+        $this->adapter->mkdir($directory);
+    }
+
+    /**
+     * Remove a directory
+     *
+     * @param  string $directory
+     * @return void
+     */
+    public function rmdir(string $directory): void
+    {
+        $this->adapter->rmdir($directory);
+    }
+
+    /**
+     * List directories
+     *
+     * @return array
+     */
+    public function listDirs(): array
+    {
+        return $this->adapter->listDirs();
+    }
+
+    /**
+     * List files
+     *
+     * @return array
+     */
+    public function listFiles(): array
+    {
+        return $this->adapter->listFiles();
+    }
+
+    /**
+     * Put file
+     *
+     * @param  string $fileFrom
+     * @param  bool   $copy
+     * @return void
+     */
+    public function putFile(string $fileFrom, bool $copy = true): void
+    {
+        $this->adapter->putFile($fileFrom, $copy);
+    }
+
+    /**
+     * Put file contents
+     *
+     * @param  string $filename
+     * @param  string $fileContents
+     * @return void
+     */
+    public function putFileContents(string $filename, string $fileContents): void
+    {
+        $this->adapter->putFileContents($filename, $fileContents);
+    }
+
+    /**
+     * Upload file from server request
+     *
+     * @param  array $file
+     * @return void
+     */
+    public function uploadFile(array $file): void
+    {
+        $this->adapter->uploadFile($file);
+    }
+
+    /**
+     * Copy file
+     *
+     * @param  string $sourceFile
+     * @param  string $destFile
+     * @return void
+     */
+    public function copyFile(string $sourceFile, string $destFile): void
+    {
+        $this->adapter->copyFile($sourceFile, $destFile);
+    }
+
+    /**
+     * Rename file
+     *
+     * @param  string $oldFile
+     * @param  string $newFile
+     * @return void
+     */
+    public function renameFile(string $oldFile, string $newFile): void
+    {
+        $this->adapter->renameFile($oldFile, $newFile);
+    }
+
+    /**
+     * Replace file
+     *
+     * @param  string $filename
+     * @param  string $fileContents
+     * @return void
+     */
+    public function replaceFileContents(string $filename, string $fileContents): void
+    {
+        $this->adapter->replaceFileContents($filename, $fileContents);
+    }
+
+    /**
+     * Delete file
+     *
+     * @param  string $filename
+     * @return void
+     */
+    public function deleteFile(string $filename): void
+    {
+        $this->adapter->deleteFile($filename);
+    }
+
+    /**
+     * Fetch file contents
+     *
+     * @param  string $filename
+     * @return mixed
+     */
+    public function fetchFile(string $filename): mixed
+    {
+        return $this->adapter->fetchFile($filename);
+    }
+
+    /**
+     * File exists
+     *
+     * @param  string $filename
+     * @return bool
+     */
+    public function fileExists(string $filename): bool
+    {
+        return $this->adapter->fileExists($filename);
+    }
+
+    /**
+     * Check if is a dir
+     *
+     * @param  string $directory
+     * @return bool
+     */
+    public function isDir(string $directory): bool
+    {
+        return $this->adapter->isDir($directory);
+    }
+
+    /**
+     * Check if is a file
+     *
+     * @param  string $filename
+     * @return bool
+     */
+    public function isFile(string $filename): bool
+    {
+        return $this->adapter->isFile($filename);
+    }
+
+    /**
+     * Get file size
+     *
+     * @param  string $filename
+     * @return int|bool
+     */
+    public function getFileSize(string $filename): int|bool
+    {
+        return $this->adapter->getFileSize($filename);
+    }
+
+    /**
+     * Get file type
+     *
+     * @param  string $filename
+     * @return string|bool
+     */
+    public function getFileType(string $filename): string|bool
+    {
+        return $this->adapter->getFileType($filename);
+    }
+
+    /**
+     * Get file modified time
+     *
+     * @param  string $filename
+     * @return int|bool
+     */
+    public function getFileMTime(string $filename): int|bool
+    {
+        return $this->adapter->getFileMTime($filename);
+    }
+
+    /**
+     * Create MD5 checksum of the file
+     *
+     * @param  string $filename
+     * @return string|bool
+     */
+    public function md5File(string $filename): string|bool
+    {
+        return $this->adapter->md5File($filename);
+    }
+    
 }

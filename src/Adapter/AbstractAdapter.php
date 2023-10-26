@@ -13,6 +13,8 @@
  */
 namespace Pop\Storage\Adapter;
 
+use Pop\Storage\StorageInterface;
+
 /**
  * Storage adapter abstract class
  *
@@ -23,7 +25,7 @@ namespace Pop\Storage\Adapter;
  * @license    http://www.popphp.org/license     New BSD License
  * @version    2.0.0
  */
-abstract class AbstractAdapter implements AdapterInterface
+abstract class AbstractAdapter implements StorageInterface
 {
 
     /**
@@ -46,6 +48,7 @@ abstract class AbstractAdapter implements AdapterInterface
     public function __construct(string $directory)
     {
         $this->setBaseDir($directory);
+        $this->chdir();
     }
 
     /**
@@ -56,7 +59,7 @@ abstract class AbstractAdapter implements AdapterInterface
      */
     public function setBaseDir(?string $directory = null): void
     {
-        $this->baseDirectory = $directory;
+        $this->baseDirectory = realpath($directory);
     }
 
     /**
@@ -90,12 +93,7 @@ abstract class AbstractAdapter implements AdapterInterface
         if ($directory === null) {
             $this->directory = $this->baseDirectory;
         } else {
-            if (str_starts_with($directory, '/') || str_starts_with($directory, '\\')) {
-                $directory = substr($directory, 1);
-            } else if (str_starts_with($directory, './') || str_starts_with($directory, '.\\')) {
-                $directory = substr($directory, 2);
-            }
-            $this->directory = $this->baseDirectory . DIRECTORY_SEPARATOR . $directory;
+            $this->directory = $this->baseDirectory . DIRECTORY_SEPARATOR . $this->scrub($directory);
         }
     }
 
@@ -130,73 +128,73 @@ abstract class AbstractAdapter implements AdapterInterface
     abstract public function listFiles(): array;
 
     /**
-     * Fetch file
-     *
-     * @param  string $file
-     * @return mixed
-     */
-    abstract public function fetchFile(string $file): mixed;
-
-    /**
      * Put file
      *
-     * @param  string $file
+     * @param  string $fileFrom
+     * @param  bool   $copy
      * @return void
      */
-    abstract public function putFile(string $file): void;
+    abstract public function putFile(string $fileFrom, bool $copy = true): void;
 
     /**
      * Put file contents
      *
-     * @param  string $file
+     * @param  string $filename
      * @param  string $fileContents
      * @return void
      */
-    abstract public function putFileContents(string $file, string $fileContents): void;
+    abstract public function putFileContents(string $filename, string $fileContents): void;
 
     /**
-     * Rename file
+     * Upload file from server request
      *
-     * @param  string $oldFile
-     * @param  string $newFile
-     * @return mixed
+     * @param  array $file
+     * @return void
      */
-    abstract public function renameFile(string $oldFile, string $newFile): mixed;
+    abstract public function uploadFile(array $file): void;
 
     /**
      * Copy file
      *
      * @param  string $sourceFile
      * @param  string $destFile
-     * @return mixed
+     * @return void
      */
-    abstract public function copyFile(string $sourceFile, string $destFile): mixed;
+    abstract public function copyFile(string $sourceFile, string $destFile): void;
 
     /**
-     * Replace file
+     * Rename file
      *
      * @param  string $oldFile
      * @param  string $newFile
-     * @return mixed
+     * @return void
      */
-    abstract public function replaceFile(string $oldFile, string $newFile): mixed;
+    abstract public function renameFile(string $oldFile, string $newFile): void;
 
     /**
      * Replace file
      *
-     * @param  string $file
+     * @param  string $filename
      * @param  string $fileContents
-     * @return mixed
+     * @return void
      */
-    abstract public function replaceFileContents(string $file, string $fileContents): mixed;
+    abstract public function replaceFileContents(string $filename, string $fileContents): void;
 
     /**
-     * Delete
+     * Delete file
      *
      * @param  string $filename
      * @return void
      */
     abstract public function deleteFile(string $filename): void;
+
+    /**
+     * Fetch file contents
+     *
+     * @param  string $filename
+     * @return mixed
+     */
+    abstract public function fetchFile(string $filename): mixed;
 
     /**
      * File exists
@@ -250,26 +248,25 @@ abstract class AbstractAdapter implements AdapterInterface
      * Create MD5 checksum of the file
      *
      * @param  string $filename
+     * @return string|bool
+     */
+    abstract public function md5File(string $filename): string|bool;
+
+    /**
+     * Scrub value of leading dots or slashes
+     *
+     * @param  string $value
      * @return string
      */
-    abstract public function md5File(string $filename): string;
+    protected function scrub(string $value): string
+    {
+        if (str_starts_with($value, '/') || str_starts_with($value, '\\')) {
+            $value = substr($value, 1);
+        } else if (str_starts_with($value, './') || str_starts_with($value, '.\\')) {
+            $value = substr($value, 2);
+        }
 
-    /**
-     * Load file lines into array
-     *
-     * @param  string $filename
-     * @throws Exception
-     * @return array
-     */
-    abstract public function loadFile(string $filename): array;
+        return $value;
+    }
 
-    /**
-     * Get file contents
-     *
-     * @param  string $filename
-     * @throws Exception
-     * @return array
-     */
-    abstract public function getFileContents(string $filename): mixed;
-    
 }
