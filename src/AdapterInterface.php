@@ -93,6 +93,14 @@ interface AdapterInterface
     public function uploadFileStream(string $fileStream, string $filename, ?string $folder = null): string;
 
     /**
+     * Put file
+     *
+     * @param  string $filename
+     * @return void
+     */
+    public function putFile(string $filename): void;
+
+    /**
      * Replace file
      *
      * @param  string $filename

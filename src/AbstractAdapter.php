@@ -136,6 +136,14 @@ abstract class AbstractAdapter implements AdapterInterface
     abstract public function uploadFileStream(string $fileStream, string $filename, ?string $folder = null): string;
 
     /**
+     * Put file
+     *
+     * @param  string $filename
+     * @return void
+     */
+    abstract public function putFile(string $filename): void;
+
+    /**
      * Replace file
      *
      * @param  string $filename
