@@ -13,6 +13,8 @@
  */
 namespace Pop\Storage;
 
+use Aws\S3\S3Client;
+
 /**
  * Storage  class
  *
@@ -25,6 +27,42 @@ namespace Pop\Storage;
  */
 class Storage extends AbstractStorage
 {
+
+    /**
+     * Create storage object with local adapter
+     *
+     * @param  string $directory
+     * @return Storage
+     */
+    public static function createLocal(string $directory): Storage
+    {
+        return new self(new Adapter\Local($directory));
+    }
+
+    /**
+     * Create storage object with S3 adapter
+     *
+     * @param  string   $directory
+     * @param  S3Client $client
+     * @return Storage
+     */
+    public static function createS3(string $directory, S3Client $client): Storage
+    {
+        return new self(new Adapter\S3($directory, $client));
+    }
+
+    /**
+     * Create storage object with S3 adapter
+     *
+     * @param  string $accountName
+     * @param  string $accountKey
+     * @throws \Pop\Http\Client\Exception
+     * @return Storage
+     */
+    public static function createAzure(string $accountName, string $accountKey): Storage
+    {
+        return new self(Adapter\Azure::create($accountName, $accountKey));
+    }
 
     /**
      * Set base directory

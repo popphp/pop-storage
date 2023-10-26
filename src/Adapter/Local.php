@@ -95,7 +95,6 @@ class Local extends AbstractAdapter
             } else {
                 rename($fileFrom, $this->directory . DIRECTORY_SEPARATOR . basename($fileFrom));
             }
-
         }
     }
 

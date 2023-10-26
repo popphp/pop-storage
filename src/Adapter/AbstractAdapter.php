@@ -59,7 +59,7 @@ abstract class AbstractAdapter implements StorageInterface
      */
     public function setBaseDir(?string $directory = null): void
     {
-        $this->baseDirectory = realpath($directory);
+        $this->baseDirectory = $directory;
     }
 
     /**
