@@ -32,9 +32,9 @@ interface AuthInterface
      * Set account name
      *
      * @param  string $accountName
-     * @return AbstractAuth
+     * @return AuthInterface
      */
-    public function setAccountName(string $accountName): AbstractAuth;
+    public function setAccountName(string $accountName): AuthInterface;
 
     /**
      * Get account name
@@ -54,9 +54,9 @@ interface AuthInterface
      * Set account key
      *
      * @param  string $accountKey
-     * @return AbstractAuth
+     * @return AuthInterface
      */
-    public function setAccountKey(string $accountKey): AbstractAuth;
+    public function setAccountKey(string $accountKey): AuthInterface;
 
     /**
      * Get account key
