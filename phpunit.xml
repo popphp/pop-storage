@@ -17,6 +17,8 @@
     <env name="AWS_REGION" value="us-east-2"/>
     <env name="AWS_BUCKET" value="s3://TEST_BUCKET"/>
     <env name="AWS_VERSION" value="latest"/>
+    <env name="AZURE_NAME" value=""/>
+    <env name="AZURE_KEY" value=""/>
   </php>
   <source>
     <include>

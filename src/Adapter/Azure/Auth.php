@@ -4,16 +4,15 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@nolainteractive.com>
- * @copyright  Copyright (c) 2009-2023 NOLA Interactive, LLC. (http://www.nolainteractive.com)
+ * @copyright  Copyright (c) 2009-2024 NOLA Interactive, LLC. (http://www.nolainteractive.com)
  * @license    http://www.popphp.org/license     New BSD License
  */
 
 /**
  * @namespace
  */
-namespace Pop\Storage\Azure;
+namespace Pop\Storage\Adapter\Azure;
 
-use Pop\Http\Client;
 use Pop\Http\Client\Request;
 
 /**
@@ -25,30 +24,21 @@ use Pop\Http\Client\Request;
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@nolainteractive.com>
- * @copyright  Copyright (c) 2009-2023 NOLA Interactive, LLC. (http://www.nolainteractive.com)
+ * @copyright  Copyright (c) 2009-2024 NOLA Interactive, LLC. (http://www.nolainteractive.com)
  * @license    http://www.popphp.org/license     New BSD License
- * @version    1.0.0
+ * @version    2.0.0
  */
-class Auth
+class Auth extends AbstractAuth
 {
-
-    /**
-     * Account name
-     * @var ?string
-     */
-    protected ?string $accountName = null;
-
-    /**
-     * Account key
-     * @var ?string
-     */
-    protected ?string $accountKey = null;
 
     /**
      * The included headers
      * @var array
      */
-    protected array $includedHeaders = [];
+    protected array $includedHeaders = [
+        'content-encoding', 'content-language', 'content-length', 'content-md5', 'content-type', 'date',
+        'if-modified-since', 'if-match', 'if-none-match', 'if-unmodified-since', 'range',
+    ];
 
     /**
      * Constructor.
@@ -58,20 +48,8 @@ class Auth
      */
     public function __construct(string $accountName, string $accountKey)
     {
-        $this->accountKey  = $accountKey;
-        $this->accountName = $accountName;
-
-        $this->includedHeaders[] = 'content-encoding';
-        $this->includedHeaders[] = 'content-language';
-        $this->includedHeaders[] = 'content-length';
-        $this->includedHeaders[] = 'content-md5';
-        $this->includedHeaders[] = 'content-type';
-        $this->includedHeaders[] = 'date';
-        $this->includedHeaders[] = 'if-modified-since';
-        $this->includedHeaders[] = 'if-match';
-        $this->includedHeaders[] = 'if-none-match';
-        $this->includedHeaders[] = 'if-unmodified-since';
-        $this->includedHeaders[] = 'range';
+        $this->setAccountName($accountName);
+        $this->setAccountKey($accountKey);
     }
 
     /**
@@ -101,7 +79,8 @@ class Auth
     public function signRequest(Request $request): Request
     {
         $signedKey = $this->getAuthorizationHeader(
-            self::formatHeaders($request->getHeadersAsArray()), $request->getUriAsString(), $request->getQuery(), $request->getMethod()
+            self::formatHeaders($request->getHeadersAsArray()), $request->getUriAsString(),
+            $request->getQuery(), $request->getMethod()
         );
 
         return $request->addHeader('authorization', $signedKey);
@@ -110,7 +89,7 @@ class Auth
     /**
      * Returns the specified value of the $key passed from $array and in case that
      * this $key doesn't exist, the default value is returned. The key matching is
-     * done in a case insensitive manner.
+     * done in a case-insensitive manner.
      *
      * @param  string $key
      * @param  array  $haystack

@@ -11,10 +11,10 @@
 /**
  * @namespace
  */
-namespace Pop\Storage\Azure;
+namespace Pop\Storage;
 
 /**
- * Storage Azure exception class
+ * Storage abstract class
  *
  * @category   Pop
  * @package    Pop\Storage
@@ -23,4 +23,7 @@ namespace Pop\Storage\Azure;
  * @license    http://www.popphp.org/license     New BSD License
  * @version    2.0.0
  */
-class Exception extends \Exception {}
+abstract class AbstractStorage implements StorageInterface
+{
+
+}
