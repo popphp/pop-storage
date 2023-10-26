@@ -56,12 +56,17 @@ class Storage extends AbstractStorage
      *
      * @param  string $accountName
      * @param  string $accountKey
+     * @param  ?string $container
      * @throws \Pop\Http\Client\Exception
      * @return Storage
      */
-    public static function createAzure(string $accountName, string $accountKey): Storage
+    public static function createAzure(string $accountName, string $accountKey, ?string $container = null): Storage
     {
-        return new self(Adapter\Azure::create($accountName, $accountKey));
+        $azure = new self(Adapter\Azure::create($accountName, $accountKey));
+        if ($container != null) {
+            $azure->chdir($container);
+        }
+        return $azure;
     }
 
     /**
@@ -173,7 +178,20 @@ class Storage extends AbstractStorage
     }
 
     /**
-     * Upload file from server request
+     * Upload files from server request $_FILES
+     *
+     * @param  array $files
+     * @return void
+     */
+    public function uploadFiles(array $files): void
+    {
+        foreach ($files as $file) {
+            $this->adapter->uploadFile($file);
+        }
+    }
+
+    /**
+     * Upload file from server request $_FILES['file']
      *
      * @param  array $file
      * @return void
@@ -242,6 +260,17 @@ class Storage extends AbstractStorage
     }
 
     /**
+     * Fetch file info
+     *
+     * @param  string $filename
+     * @return array
+     */
+    public function fetchFileInfo(string $filename): array
+    {
+        return $this->adapter->fetchFileInfo($filename);
+    }
+
+    /**
      * File exists
      *
      * @param  string $filename
@@ -300,9 +329,9 @@ class Storage extends AbstractStorage
      * Get file modified time
      *
      * @param  string $filename
-     * @return int|bool
+     * @return int|string|bool
      */
-    public function getFileMTime(string $filename): int|bool
+    public function getFileMTime(string $filename): int|string|bool
     {
         return $this->adapter->getFileMTime($filename);
     }

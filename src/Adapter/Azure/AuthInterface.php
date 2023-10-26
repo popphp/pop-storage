@@ -73,6 +73,13 @@ interface AuthInterface
     public function hasAccountKey(): bool;
 
     /**
+     * Get account key
+     *
+     * @return string
+     */
+    public function getBaseUri(): string;
+
+    /**
      * Returns authorization header to be included in the request.
      *
      * @param  array  $headers

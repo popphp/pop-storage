@@ -209,7 +209,7 @@ class S3 extends AbstractAdapter
     }
 
     /**
-     * Upload file from server request
+     * Upload file from server request $_FILES['file']
      *
      * @param  array $file
      * @throws Exception
@@ -229,7 +229,7 @@ class S3 extends AbstractAdapter
      *
      * @param  string $sourceFile
      * @param  string $destFile
-     * @return mixed
+     * @return void
      */
     public function copyFile(string $sourceFile, string $destFile): void
     {
@@ -245,7 +245,7 @@ class S3 extends AbstractAdapter
      *
      * @param  string $oldFile
      * @param  string $newFile
-     * @return mixed
+     * @return void
      */
     public function renameFile(string $oldFile, string $newFile): void
     {
@@ -261,7 +261,7 @@ class S3 extends AbstractAdapter
      *
      * @param  string $filename
      * @param  string $fileContents
-     * @return mixed
+     * @return void
      */
     public function replaceFileContents(string $filename, string $fileContents): void
     {
@@ -295,6 +295,26 @@ class S3 extends AbstractAdapter
     {
         $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
         return (file_exists($filename)) ? file_get_contents($filename) : false;
+    }
+
+    /**
+     * Fetch file info
+     *
+     * @param  string $filename
+     * @return array
+     */
+    public function fetchFileInfo(string $filename): array
+    {
+        if (file_exists($this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename))) {
+            $fileObject = $this->client->headObject([
+                'Bucket' => str_replace('s3://', '', $this->directory),
+                'Key'    => $this->scrub($filename),
+            ]);
+
+            return $fileObject->toArray();
+        } else {
+            return [];
+        }
     }
 
     /**
@@ -358,9 +378,9 @@ class S3 extends AbstractAdapter
      * Get file modified time
      *
      * @param  string $filename
-     * @return int|bool
+     * @return int|string|bool
      */
-    public function getFileMTime(string $filename): int|bool
+    public function getFileMTime(string $filename): int|string|bool
     {
         $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
         return (file_exists($filename)) ? filemtime($filename) : false;

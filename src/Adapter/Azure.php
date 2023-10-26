@@ -13,9 +13,11 @@
  */
 namespace Pop\Storage\Adapter;
 
+use Pop\Http\Client\Exception;
 use Pop\Storage\Adapter\Azure\Auth;
 use Pop\Http\Client;
 use Pop\Http\Client\Request;
+use Pop\Utils\File;
 
 /**
  * Storage adapter Azure class
@@ -46,14 +48,13 @@ class Azure extends AbstractAdapter
      * Constructor
      *
      * @param string $location
-     * @param Client $client
      * @param Auth   $auth
      */
-    public function __construct(string $location, Client $client, Auth $auth)
+    public function __construct(string $location, Auth $auth)
     {
         parent::__construct($location);
-        $this->setClient($client);
         $this->setAuth($auth);
+        $this->initClient();
     }
 
     /**
@@ -61,22 +62,45 @@ class Azure extends AbstractAdapter
      *
      * @param  string $accountName
      * @param  string $accountKey
-     * @throws \Pop\Http\Client\Exception
      * @return Azure
      */
     public static function create(string $accountName, string $accountKey): Azure
     {
-        $auth    = new Azure\Auth($accountName, $accountKey);
+        return new self($accountName, new Azure\Auth($accountName, $accountKey));
+    }
 
-        $request = new Request('https://' . $accountName . '.blob.core.windows.net');
+    /**
+     * Initialize client
+     *
+     * @param  string $method
+     * @param  array  $headers
+     * @param  bool   $auto
+     * @return Azure
+     */
+    public function initClient(string $method = 'GET', array $headers = [], bool $auto = true): Azure
+    {
+        $request = new Request('/', $method);
         $request->addHeader('Date', gmdate('D, d M Y H:i:s T'))
-            ->addHeader('Host', $accountName . '.blob.core.windows.net')
+            ->addHeader('Host', $this->auth->getAccountName() . '.blob.core.windows.net')
             ->addHeader('Content-Type', Client\Request::URLFORM)
             ->addHeader('User-Agent', 'pop-storage/2.0.0 (PHP ' . PHP_VERSION . ')/' . PHP_OS)
             ->addHeader('x-ms-client-request-id', uniqid())
             ->addHeader('x-ms-version', '2023-11-03');
 
-        return new self($accountName, new Client($request), $auth);
+        if (!empty($headers)) {
+            foreach ($headers as $header => $value) {
+                $request->addHeader($header, $value);
+            }
+        }
+
+        $this->setClient(new Client(
+            $request, [
+                'base_uri' => $this->auth->getBaseUri(),
+                'auto'     => $auto
+            ]
+        ));
+
+        return $this;
     }
 
     /**
@@ -141,6 +165,504 @@ class Azure extends AbstractAdapter
     public function hasAuth(): bool
     {
         return ($this->auth !== null);
+    }
+
+    /**
+     * Make directory
+     *
+     * @param  string $directory
+     * @return void
+     */
+    public function mkdir(string $directory): void
+    {
+        /**
+         * Azure storage doesn't allow the creation of empty "directories" (prefixes.)
+         * A new "directory" (prefix) is automatically created with an upload file that utilizes a prefix
+         */
+    }
+
+    /**
+     * Remove a directory
+     *
+     * @param  string $directory
+     * @return void
+     */
+    public function rmdir(string $directory): void
+    {
+        /**
+         * Azure storage doesn't allow the direct removal of "directories" (prefixes.)
+         * A "directory" (prefix) is automatically removed when the last file that utilizes the prefix is deleted.
+         */
+    }
+
+    /**
+     * List directories
+     *
+     * @return array
+     */
+    public function listDirs(): array
+    {
+        $dirs = [];
+
+        if ($this->baseDirectory == $this->directory) {
+            $this->initClient();
+            $this->client->getRequest()->setQuery(['comp' => 'list']);
+            $this->auth->signRequest($this->client->getRequest());
+
+            $response = $this->client->send();
+
+            if (is_array($response) && !empty($response['Containers'])) {
+                foreach ($response['Containers'] as $container) {
+                    $dirs[] = $container['Name'];
+                }
+            }
+        } else {
+            $container = str_replace($this->baseDirectory, '', $this->directory);
+
+            $params = ['restype' => 'container', 'comp' => 'list'];
+            if (substr_count($container, '/') > 1) {
+                $folders          = array_filter(explode('/', $container));
+                $container        = '/' . array_shift($folders);
+                $params['prefix'] = implode('/', $folders) . '/';
+            }
+
+            $this->initClient();
+            $this->client->getRequest()->setQuery($params);
+            $this->client->getRequest()->setUri($container);
+            $this->auth->signRequest($this->client->getRequest());
+
+            $response = $this->client->send();
+
+            if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
+                $blobs = (!isset($response['Blobs']['Blob'][0])) ?
+                    [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
+                foreach ($blobs as $blob) {
+                    $name = (isset($params['prefix']) && str_starts_with($blob['Name'], $params['prefix'])) ?
+                        substr($blob['Name'], strlen($params['prefix'])) : $blob['Name'];
+                    if (!empty($name) && (substr_count($name, '/') >= 1)) {
+                        $folder = substr($name, 0, (strpos($name, '/') + 1));
+                        if (!in_array($folder, $dirs)) {
+                            $dirs[] = $folder;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $dirs;
+    }
+
+    /**
+     * List files
+     *
+     * @return array
+     */
+    public function listFiles(): array
+    {
+        $files = [];
+
+        if ($this->baseDirectory !== $this->directory) {
+            $container = str_replace($this->baseDirectory, '', $this->directory);
+
+            $params = ['restype' => 'container', 'comp' => 'list'];
+            if (substr_count($container, '/') > 1) {
+                $folders          = array_filter(explode('/', $container));
+                $container        = '/' . array_shift($folders);
+                $params['prefix'] = implode('/', $folders) . '/';
+            }
+
+            $this->initClient();
+            $this->client->getRequest()->setQuery($params);
+            $this->client->getRequest()->setUri($container);
+            $this->auth->signRequest($this->client->getRequest());
+
+            $response = $this->client->send();
+
+            if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
+                $blobs = (!isset($response['Blobs']['Blob'][0])) ?
+                    [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
+                foreach ($blobs as $blob) {
+                    $name = (isset($params['prefix']) && str_starts_with($blob['Name'], $params['prefix'])) ?
+                        substr($blob['Name'], strlen($params['prefix'])) : $blob['Name'];
+                    if (!empty($name) && !str_contains($name, '/')) {
+                        $files[] = $name;
+                    }
+                }
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * Put file
+     *
+     * @param  string $fileFrom
+     * @param  bool $copy
+     * @throws Exception|Client\Handler\Exception|\Pop\Http\Exception|\Pop\Utils\Exception
+     * @return void
+     */
+    public function putFile(string $fileFrom, bool $copy = true): void
+    {
+        if (file_exists($fileFrom)) {
+            $uri = '/' . basename($fileFrom);
+            if ($this->baseDirectory !== $this->directory) {
+                $directory = str_replace($this->baseDirectory, '', $this->directory);
+                if (str_ends_with($directory, '/')) {
+                    $directory = substr($directory, 0, -1);
+                }
+                $uri = $directory . $uri;
+            }
+
+            $fileContents = file_get_contents($fileFrom);
+
+            $this->initClient('PUT', [
+                'content-length'         => strlen($fileContents),
+                'x-ms-blob-type'         => 'BlockBlob',
+                'x-ms-blob-content-type' => File::getFileMimeType($fileFrom)
+            ]);
+            $this->client->getRequest()->setUri($uri);
+            $this->client->getRequest()->setBody($fileContents);
+            $this->auth->signRequest($this->client->getRequest());
+            $this->client->send();
+        }
+    }
+
+    /**
+     * Put file contents
+     *
+     * @param  string $filename
+     * @param  string $fileContents
+     * @return void
+     */
+    public function putFileContents(string $filename, string $fileContents): void
+    {
+        $uri = '/' . $filename;
+        if ($this->baseDirectory !== $this->directory) {
+            $directory = str_replace($this->baseDirectory, '', $this->directory);
+            if (str_ends_with($directory, '/')) {
+                $directory = substr($directory, 0, -1);
+            }
+            $uri = $directory . $uri;
+        }
+
+        $this->initClient('PUT', [
+            'content-length'         => strlen($fileContents),
+            'x-ms-blob-type'         => 'BlockBlob',
+            'x-ms-blob-content-type' => File::getFileMimeType($filename)
+        ]);
+        $this->client->getRequest()->setUri($uri);
+        $this->client->getRequest()->setBody($fileContents);
+        $this->auth->signRequest($this->client->getRequest());
+        $this->client->send();
+    }
+
+    /**
+     * Upload file from server request $_FILES['file']
+     *
+     * @param  array $file
+     * @throws Exception
+     * @return void
+     */
+    public function uploadFile(array $file): void
+    {
+        if (!isset($file['tmp_name']) || !isset($file['name'])) {
+            throw new Exception('Error: The uploaded file array was not valid');
+        }
+        if (file_exists($file['tmp_name'])) {
+            $uri = '/' . $file['name'];
+            if ($this->baseDirectory !== $this->directory) {
+                $directory = str_replace($this->baseDirectory, '', $this->directory);
+                if (str_ends_with($directory, '/')) {
+                    $directory = substr($directory, 0, -1);
+                }
+                $uri = $directory . $uri;
+            }
+
+            $fileContents = file_get_contents($file['tmp_name']);
+
+            $this->initClient('PUT', [
+                'content-length'         => strlen($fileContents),
+                'x-ms-blob-type'         => 'BlockBlob',
+                'x-ms-blob-content-type' => File::getFileMimeType($file['name'])
+            ]);
+            $this->client->getRequest()->setUri($uri);
+            $this->client->getRequest()->setBody($fileContents);
+            $this->auth->signRequest($this->client->getRequest());
+            $this->client->send();
+        }
+    }
+
+    /**
+     * Copy file
+     *
+     * @param  string $sourceFile
+     * @param  string $destFile
+     * @return void
+     */
+    public function copyFile(string $sourceFile, string $destFile): void
+    {
+        $sourceFileInfo = $this->fetchFileInfo($sourceFile);
+
+        if (is_array($sourceFileInfo) && isset($sourceFileInfo['headers']) &&
+            isset($sourceFileInfo['headers']['Content-Type']) && (!$sourceFileInfo['isError'])) {
+            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $sourceFile : $sourceFile;
+            $destUri   = (!str_starts_with($destFile, '/')) ? '/' . $destFile : $destFile;
+
+            if ($this->baseDirectory !== $this->directory) {
+                $directory = str_replace($this->baseDirectory, '', $this->directory);
+                if (str_ends_with($directory, '/')) {
+                    $directory = substr($directory, 0, -1);
+                }
+                $sourceUri = $directory . $sourceUri;
+                $destUri   = $directory . $destUri;
+            }
+
+            $this->initClient('PUT', [
+                'content-length'   => $sourceFileInfo['headers']['Content-Length'],
+                'x-ms-copy-source' => $this->auth->getBaseUri() . $sourceUri,
+            ]);
+            $this->client->getRequest()->setUri($destUri);
+            $this->auth->signRequest($this->client->getRequest());
+            $this->client->send();
+        }
+    }
+
+    /**
+     * Rename file
+     *
+     * @param  string $oldFile
+     * @param  string $newFile
+     * @return void
+     */
+    public function renameFile(string $oldFile, string $newFile): void
+    {
+        $this->copyFile($oldFile, $newFile);
+        $this->deleteFile($oldFile);
+    }
+
+    /**
+     * Replace file
+     *
+     * @param  string $filename
+     * @param  string $fileContents
+     * @return void
+     */
+    public function replaceFileContents(string $filename, string $fileContents): void
+    {
+        $this->putFileContents($filename, $fileContents);
+    }
+
+    /**
+     * Delete file
+     *
+     * @param  string  $filename
+     * @param  ?string $snapshots ['include', 'only', null]
+     * @return void
+     */
+    public function deleteFile(string $filename, ?string $snapshots = 'include'): void
+    {
+        $uri = '/' . $filename;
+        if ($this->baseDirectory !== $this->directory) {
+            $directory = str_replace($this->baseDirectory, '', $this->directory);
+            if (str_ends_with($directory, '/')) {
+                $directory = substr($directory, 0, -1);
+            }
+            $uri = $directory . $uri;
+        }
+
+        $headers = [];
+        if ($snapshots !== null) {
+            $headers['x-ms-delete-snapshots'] = ($snapshots == 'only') ? 'only' : 'include';
+        }
+
+        $this->initClient('DELETE', $headers);
+        $this->client->getRequest()->setUri($uri);
+        $this->auth->signRequest($this->client->getRequest());
+        $this->client->send();
+    }
+
+    /**
+     * Fetch file
+     *
+     * @param  string $filename
+     * @param  bool   $raw
+     * @return mixed
+     */
+    public function fetchFile(string $filename, bool $raw = true): mixed
+    {
+        $filename = (!str_starts_with($filename, '/')) ? '/' . $filename : $filename;
+
+        if ($this->baseDirectory !== $this->directory) {
+            $directory = str_replace($this->baseDirectory, '', $this->directory);
+            if (str_ends_with($directory, '/')) {
+                $directory = substr($directory, 0, -1);
+            }
+            $filename = $directory . $filename;
+        }
+
+        $this->initClient('GET', [], false);
+        $this->client->getRequest()->setUri($filename);
+        $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
+
+        if ($response->isSuccess()) {
+            return ($raw) ? $response->getBody()->getContent(): $response;
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Fetch file info
+     *
+     * @param  string $filename
+     * @return array
+     */
+    public function fetchFileInfo(string $filename): array
+    {
+        $filename = (!str_starts_with($filename, '/')) ? '/' . $filename : $filename;
+
+        if ($this->baseDirectory !== $this->directory) {
+            $directory = str_replace($this->baseDirectory, '', $this->directory);
+            if (str_ends_with($directory, '/')) {
+                $directory = substr($directory, 0, -1);
+            }
+            $filename = $directory . $filename;
+        }
+
+        $this->initClient('HEAD', [], false);
+        $this->client->getRequest()->setUri($filename);
+        $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
+
+        return [
+            'code'    => $response->getCode(),
+            'message' => $response->getMessage(),
+            'headers' => $response->getHeadersAsArray(),
+            'isError' => $response->isError()
+        ];
+    }
+
+    /**
+     * File exists
+     *
+     * @param  string $filename
+     * @return bool
+     */
+    public function fileExists(string $filename): bool
+    {
+        $info = $this->fetchFileInfo($filename);
+        return (isset($info['code']) && ((int)$info['code'] == 200));
+    }
+
+    /**
+     * Check if is a dir
+     *
+     * @param  string $directory
+     * @return bool
+     */
+    public function isDir(string $directory): bool
+    {
+        if (str_starts_with($directory, '/')) {
+            $directory = substr($directory, 1);
+        }
+        if (str_ends_with($directory, '/')) {
+            $directory = substr($directory, 0, -1);
+        }
+
+        $directories  = explode('/', $directory);
+        $result       = false;
+        $curDirectory = $this->directory;
+        $dirString    = substr(str_replace($this->baseDirectory, '', $this->directory), 1) . '/';
+        foreach ($directories as $directory) {
+            $dirs       = $this->listDirs();
+            $dirString .= $directory . '/';
+            if (in_array($directory . '/', $dirs)) {
+                $result = true;
+            } else {
+                $result = false;
+            }
+            $this->chdir($dirString);
+        }
+
+        $this->directory = $curDirectory;
+
+        return $result;
+    }
+
+    /**
+     * Check if is a file
+     *
+     * @param  string $filename
+     * @return bool
+     */
+    public function isFile(string $filename): bool
+    {
+        return $this->fileExists($filename);
+    }
+
+    /**
+     * Get file size
+     *
+     * @param  string $filename
+     * @return int|bool
+     */
+    public function getFileSize(string $filename): int|bool
+    {
+        $info = $this->fetchFileInfo($filename);
+        return $info['headers']['Content-Length'] ?? false;
+    }
+
+    /**
+     * Get file type
+     *
+     * @param  string $filename
+     * @return string|bool
+     */
+    public function getFileType(string $filename): string|bool
+    {
+        if ($this->isFile($filename)) {
+            return 'file';
+        } else if ($this->isDir($filename)) {
+            return 'dir';
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Get file modified time
+     *
+     * @param  string $filename
+     * @return int|string|bool
+     */
+    public function getFileMTime(string $filename): int|string|bool
+    {
+        $info = $this->fetchFileInfo($filename);
+        if (isset($info['headers']) && !empty($info['headers']['Last-Modified'])) {
+            return $info['headers']['Last-Modified'];
+        } else if (isset($info['headers']) && !empty($info['headers']['x-ms-creation-time'])) {
+            return $info['headers']['x-ms-creation-time'];
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Create MD5 checksum of the file
+     *
+     * @param  string $filename
+     * @return string|bool
+     */
+    public function md5File(string $filename): string|bool
+    {
+        $info = $this->fetchFileInfo($filename);
+        if (isset($info['headers']) && !empty($info['headers']['Content-MD5'])) {
+            return $info['headers']['Content-MD5'];
+        } else {
+            return false;
+        }
     }
 
 }

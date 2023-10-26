@@ -53,24 +53,6 @@ class Auth extends AbstractAuth
     }
 
     /**
-     * Returns authorization header to be included in the request.
-     *
-     * @param  array  $headers
-     * @param  string $url
-     * @param  array  $queryParams
-     * @param  string $httpMethod
-     * @return string
-     */
-    public function getAuthorizationHeader(array $headers, string $url, array $queryParams, string $httpMethod): string
-    {
-        $signature = $this->computeSignature($headers, $url, $queryParams, $httpMethod);
-
-        return 'SharedKey ' . $this->accountName . ':' . base64_encode(
-            hash_hmac('sha256', $signature, base64_decode($this->accountKey), true)
-        );
-    }
-
-    /**
      * Adds authentication header to the request headers.
      *
      * @param  Request $request
@@ -84,6 +66,24 @@ class Auth extends AbstractAuth
         );
 
         return $request->addHeader('authorization', $signedKey);
+    }
+
+    /**
+     * Returns authorization header to be included in the request.
+     *
+     * @param  array  $headers
+     * @param  string $url
+     * @param  array  $queryParams
+     * @param  string $httpMethod
+     * @return string
+     */
+    public function getAuthorizationHeader(array $headers, string $url, array $queryParams, string $httpMethod): string
+    {
+        $signature = $this->computeSignature($headers, $url, $queryParams, $httpMethod);
+
+        return 'SharedKey ' . $this->accountName . ':' . base64_encode(
+                hash_hmac('sha256', $signature, base64_decode($this->accountKey), true)
+            );
     }
 
     /**
@@ -176,7 +176,9 @@ class Auth extends AbstractAuth
         }
 
         $stringToSign[] = $canonicalizedResource;
-        return implode("\n", $stringToSign);
+        $string = implode("\n", $stringToSign);
+
+        return $string;
     }
 
     /**

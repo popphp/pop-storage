@@ -155,7 +155,7 @@ abstract class AbstractStorage implements StorageInterface
     abstract public function putFileContents(string $filename, string $fileContents): void;
 
     /**
-     * Upload file from server request
+     * Upload file from server request $_FILES['file']
      *
      * @param  array $file
      * @return void
@@ -206,6 +206,14 @@ abstract class AbstractStorage implements StorageInterface
     abstract public function fetchFile(string $filename): mixed;
 
     /**
+     * Fetch file info
+     *
+     * @param  string $filename
+     * @return array
+     */
+    abstract public function fetchFileInfo(string $filename): array;
+
+    /**
      * File exists
      *
      * @param  string $filename
@@ -249,9 +257,9 @@ abstract class AbstractStorage implements StorageInterface
      * Get file modified time
      *
      * @param  string $filename
-     * @return int|bool
+     * @return int|string|bool
      */
-    abstract public function getFileMTime(string $filename): int|bool;
+    abstract public function getFileMTime(string $filename): int|string|bool;
 
     /**
      * Create MD5 checksum of the file

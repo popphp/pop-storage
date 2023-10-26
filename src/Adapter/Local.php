@@ -14,6 +14,7 @@
 namespace Pop\Storage\Adapter;
 
 use Pop\Dir\Dir;
+use Pop\Utils\File;
 
 /**
  * Storage adapter local class
@@ -111,7 +112,7 @@ class Local extends AbstractAdapter
     }
 
     /**
-     * Upload file from server request
+     * Upload file from server request $_FILES['files']
      *
      * @param  array $file
      * @throws Exception
@@ -135,7 +136,7 @@ class Local extends AbstractAdapter
      *
      * @param  string $sourceFile
      * @param  string $destFile
-     * @return mixed
+     * @return void
      */
     public function copyFile(string $sourceFile, string $destFile): void
     {
@@ -151,7 +152,7 @@ class Local extends AbstractAdapter
      *
      * @param  string $oldFile
      * @param  string $newFile
-     * @return mixed
+     * @return void
      */
     public function renameFile(string $oldFile, string $newFile): void
     {
@@ -167,7 +168,7 @@ class Local extends AbstractAdapter
      *
      * @param  string $filename
      * @param  string $fileContents
-     * @return mixed
+     * @return void
      */
     public function replaceFileContents(string $filename, string $fileContents): void
     {
@@ -201,6 +202,18 @@ class Local extends AbstractAdapter
     {
         $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
         return (file_exists($filename)) ? file_get_contents($filename) : false;
+    }
+
+    /**
+     * Fetch file info
+     *
+     * @param  string $filename
+     * @return array
+     */
+    public function fetchFileInfo(string $filename): array
+    {
+        $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
+        return (new File($filename))->toArray();
     }
 
     /**
@@ -264,9 +277,9 @@ class Local extends AbstractAdapter
      * Get file modified time
      *
      * @param  string $filename
-     * @return int|bool
+     * @return int|string|bool
      */
-    public function getFileMTime(string $filename): int|bool
+    public function getFileMTime(string $filename): int|string|bool
     {
         $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
         return (file_exists($filename)) ? filemtime($filename) : false;

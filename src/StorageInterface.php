@@ -105,7 +105,7 @@ interface StorageInterface
     public function putFileContents(string $filename, string $fileContents): void;
 
     /**
-     * Upload file from server request
+     * Upload file from server request $_FILES['file']
      *
      * @param  array $file
      * @return void
@@ -156,6 +156,14 @@ interface StorageInterface
     public function fetchFile(string $filename): mixed;
 
     /**
+     * Fetch file info
+     *
+     * @param  string $filename
+     * @return array
+     */
+    public function fetchFileInfo(string $filename): array;
+
+    /**
      * File exists
      *
      * @param  string $filename
@@ -199,9 +207,9 @@ interface StorageInterface
      * Get file modified time
      *
      * @param  string $filename
-     * @return int|bool
+     * @return int|string|bool
      */
-    public function getFileMTime(string $filename): int|bool;
+    public function getFileMTime(string $filename): int|string|bool;
 
     /**
      * Create MD5 checksum of the file

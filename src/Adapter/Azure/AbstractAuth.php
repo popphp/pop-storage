@@ -105,6 +105,16 @@ abstract class AbstractAuth implements AuthInterface
     }
 
     /**
+     * Get account key
+     *
+     * @return string
+     */
+    public function getBaseUri(): string
+    {
+        return 'https://' . $this->accountName . '.blob.core.windows.net';
+    }
+
+    /**
      * Returns authorization header to be included in the request.
      *
      * @param  array  $headers
