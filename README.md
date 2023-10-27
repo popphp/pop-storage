@@ -142,14 +142,14 @@ $storage->deleteFile('test.pdf');
 ### Fetch file contents
 
 ```php
-$storage->fetchFile('test.pdf');
+$fileContents = $storage->fetchFile('test.pdf');
 ```
 
 ### Fetch file info
 
 ```php
 // Return an array of pertinent file information
-$storage->fetchFileInfo('test.pdf');
+$info = $storage->fetchFileInfo('test.pdf');
 ```
 
 ### Check if file exists
