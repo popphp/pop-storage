@@ -188,7 +188,9 @@ $storage = Storage::createS3('s3://my-bucket', new S3\S3Client([
 // Create the bucket 's3://my-bucket/foo'
 $storage->mkdir('foo');
 
-// Point the adapter at 's3://my-bucket/foo' Any files pushed will store here.
+// Point the adapter at 's3://my-bucket/foo'
+// Any files pushed will store here
+// Any delete calls will delete files from here
 $storage->chdir('foo');
 
 // Removes the bucket and its content
