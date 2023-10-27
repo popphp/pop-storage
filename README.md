@@ -100,6 +100,8 @@ $storage->renameFile('test.pdf', 'foo/test2.pdf');
 
 This allows you to copy or move files between different AWS buckets or Azure containers.
 
+**To External**
+
 ```php
 // AWS example. The source file remains
 $storage->copyFileToExternal('test.pdf', 's3://other-bucket/test.pdf');
@@ -115,6 +117,8 @@ $storage->moveFileToExternal('test.pdf', 's3://other-bucket/test.pdf');
 // Azure example. The source file no longer exists
 $storage->moveFileToExternal('test.pdf', '/other-bucket/test.pdf');
 ```
+
+**From External**
 
 ```php
 // AWS example. The source file remains
