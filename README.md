@@ -32,14 +32,6 @@ Or, require it in your composer.json file
 BASIC USAGE
 -----------
 
-### Setting up the Local adapter
-
-```php
-use Pop\Storage\Storage;
-
-$storage = Storage::createLocal(__DIR__ . '/tmp/');
-```
-
 ### Setting up the S3 adapter
 
 ```php
@@ -61,6 +53,14 @@ $storage = Storage::createS3('AWS_BUCKET', new S3\S3Client([
 use Pop\Storage\Storage;
 
 $storage = Storage::createAzure('ACCOUNT_NAME', 'ACCOUNT_KEY', 'CONTAINER');
+```
+
+### Setting up the Local adapter
+
+```php
+use Pop\Storage\Storage;
+
+$storage = Storage::createLocal(__DIR__ . '/tmp/');
 ```
 
 ### Put file on the remote location
