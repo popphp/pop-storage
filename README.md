@@ -6,8 +6,12 @@ pop-storage
 
 OVERVIEW
 --------
-`pop-storage` is a storage wrapper component that provides interchangeable adapters to easily manage and switch
-between different storage resources, such as the local disk or a cloud-based storage platform, like AWS S3.
+`pop-storage` is a storage component that provides interchangeable adapters to easily manage and switch
+between different storage resources. Supported storage adapters are:
+
+- AWS S3
+- Microsoft Azure
+- Local Disk
 
 `pop-storage` is a component of the [Pop PHP Framework](http://www.popphp.org/).
 
@@ -31,82 +35,90 @@ BASIC USAGE
 ### Setting up the Local adapter
 
 ```php
+use Pop\Storage\Storage;
 
-$storage = new Pop\Storage\Local(__DIR__ . '/tmp/');
-
+$storage = Storage::createLocal(__DIR__ . '/tmp/');
 ```
 
 ### Setting up the S3 adapter
 
 ```php
+use Pop\Storage\Storage;
 
-$storage = new Pop\Storage\S3($_ENV['AWS_BUCKET'], new S3\S3Client([
+$storage = Storage::createS3('AWS_BUCKET', new S3\S3Client([
     'credentials' => [
-        'key'    => $_ENV['AWS_KEY'],
-        'secret' => $_ENV['AWS_SECRET'],
+        'key'    => 'AWS_KEY',
+        'secret' => 'AWS_SECRET',
     ],
-    'region'  => $_ENV['AWS_REGION'],
-    'version' => $_ENV['AWS_VERSION']
+    'region'  => 'AWS_REGION',
+    'version' => 'AWS_VERSION'
 ]));
-
 ```
 
-### Checking if a file exists
+### Setting up the Azure adapter
 
 ```php
+use Pop\Storage\Storage;
 
+$storage = Storage::createAzure('ACCOUNT_NAME', 'ACCOUNT_KEY', 'CONTAINER');
+```
+
+### Put file on the remote location
+
+```php
+$storage->putFile('test.pdf');
+```
+
+```php
+$storage->putFileContents('test.pdf', $fileContents);
+```
+
+### Upload files from a server request ($_FILES)
+
+```php
+$storage->uploadFiles($_FILES);
+```
+```php
+// Where $file follows the file array format specified in PHP:
+// $file = ['tmp_name' => '/tmp/Hs87jdk', 'name' => 'test.pdf', 'size' => 8574, 'error' => 0]
+$storage->uploadFile($file);
+```
+
+### Copy or move file from one remote location to another
+
+```php
+// The source file remains
+$storage->copyFile('test.pdf', 'foo/test2.pdf');
+```
+
+```php
+// The source file no longer exists
+$storage->renameFile('test.pdf', 'foo/test2.pdf');
+```
+
+### Delete file
+
+```php
+$storage->deleteFile('test.pdf');
+```
+
+### Fetch file contents
+
+```php
+$storage->fetchFile('test.pdf');
+```
+
+### Fetch file info
+
+```php
+// Return an array of pertinent file information
+$storage->fetchFileInfo('test.pdf');
+```
+
+### Check if file exists
+
+```php
 if ($storage->fileExists('test.txt')) {
     // File exists
 }
-
-```
-
-### Fetch contents of a file
-
-```php
-
-$fileContents = $storage->fetchFile('test.txt');
-
-
-```
-
-### Copy a file
-
-```php
-
-$adapter->copyFile('test.txt', 'test2.txt');
-
-```
-
-### Rename a file
-
-```php
-
-$adapter->renameFile('test.txt', 'test1.txt');
-
-```
-
-
-### Replace a file
-
-```php
-
-$adapter->replaceFile('test1.txt', 'new contents');
-
-```
-
-### Make a directory
-
-```php
-
-$adapter->mkdir('test');
-
-```
-
-### Remove a directory
-
-```php
-
-$adapter->rmdir('test');
-
 ```
