@@ -10,13 +10,16 @@ class AzureTest extends TestCase
 {
 
     protected $storage = null;
+    
+    protected $storage2 = null;
 
     /**
      * @group skip
      */
     public function setUp(): void
     {
-        $this->storage = Storage::createAzure($_ENV['AZURE_NAME'], $_ENV['AZURE_KEY'], $_ENV['AZURE_CONTAINER']);
+        $this->storage  = Storage::createAzure($_ENV['AZURE_NAME'], $_ENV['AZURE_KEY'], $_ENV['AZURE_CONTAINER']);
+        $this->storage2 = Storage::createAzure($_ENV['AZURE_NAME'], $_ENV['AZURE_KEY'], $_ENV['AZURE_CONTAINER_ALT']);
     }
 
     /**
@@ -94,6 +97,74 @@ class AzureTest extends TestCase
         $this->assertTrue($this->storage->fileExists('uploaded-copy.txt'));
         $this->storage->deleteFile('uploaded-copy.txt');
         $this->assertFalse($this->storage->fileExists('uploaded-copy.txt'));
+    }
+
+    /**
+     * @group skip
+     */
+    public function testCopyFileToExternal()
+    {
+        file_put_contents(__DIR__ . '/../tmp/foo.txt', 123);
+        $this->storage->putFile(__DIR__ . '/../tmp/foo.txt', 'foo.txt');
+        $this->assertTrue($this->storage->fileExists('foo.txt'));
+        $this->storage->copyFileToExternal('foo.txt', '/' . $_ENV['AZURE_CONTAINER_ALT'] . '/foo.txt');
+        $this->assertTrue($this->storage2->fileExists('foo.txt'));
+        $this->storage->deleteFile('foo.txt');
+        $this->storage2->deleteFile('foo.txt');
+        $this->assertFalse($this->storage->fileExists('foo.txt'));
+        $this->assertFalse($this->storage2->fileExists('foo.txt'));
+        unlink(__DIR__ . '/../tmp/foo.txt');
+    }
+
+    /**
+     * @group skip
+     */
+    public function testMoveFileToExternal()
+    {
+        file_put_contents(__DIR__ . '/../tmp/foo.txt', 123);
+        $this->storage->putFile(__DIR__ . '/../tmp/foo.txt', 'foo.txt');
+        $this->assertTrue($this->storage->fileExists('foo.txt'));
+        $this->storage->moveFileToExternal('foo.txt', '/'. $_ENV['AZURE_CONTAINER_ALT'] . '/foo.txt');
+        $this->assertTrue($this->storage2->fileExists('foo.txt'));
+        $this->assertFalse($this->storage->fileExists('foo.txt'));
+        $this->storage2->deleteFile('foo.txt');
+        $this->assertFalse($this->storage->fileExists('foo.txt'));
+        $this->assertFalse($this->storage2->fileExists('foo.txt'));
+        unlink(__DIR__ . '/../tmp/foo.txt');
+    }
+
+    /**
+     * @group skip
+     */
+    public function testCopyFileFromExternal()
+    {
+        file_put_contents(__DIR__ . '/../tmp/foo.txt', 123);
+        $this->storage2->putFile(__DIR__ . '/../tmp/foo.txt', 'foo.txt');
+        $this->assertTrue($this->storage2->fileExists('foo.txt'));
+        $this->storage->copyFileFromExternal('/'. $_ENV['AZURE_CONTAINER_ALT'] . '/foo.txt', 'foo.txt');
+        $this->assertTrue($this->storage->fileExists('foo.txt'));
+        $this->storage->deleteFile('foo.txt');
+        $this->storage2->deleteFile('foo.txt');
+        $this->assertFalse($this->storage->fileExists('foo.txt'));
+        $this->assertFalse($this->storage2->fileExists('foo.txt'));
+        unlink(__DIR__ . '/../tmp/foo.txt');
+    }
+
+    /**
+     * @group skip
+     */
+    public function testMoveFileFromExternal()
+    {
+        file_put_contents(__DIR__ . '/../tmp/foo.txt', 123);
+        $this->storage2->putFile(__DIR__ . '/../tmp/foo.txt', 'foo.txt');
+        $this->assertTrue($this->storage2->fileExists('foo.txt'));
+        $this->storage->moveFileFromExternal('/'. $_ENV['AZURE_CONTAINER_ALT'] . '/foo.txt', 'foo.txt');
+        $this->assertTrue($this->storage->fileExists('foo.txt'));
+        $this->assertFalse($this->storage2->fileExists('foo.txt'));
+        $this->storage->deleteFile('foo.txt');
+        $this->assertFalse($this->storage->fileExists('foo.txt'));
+        $this->assertFalse($this->storage2->fileExists('foo.txt'));
+        unlink(__DIR__ . '/../tmp/foo.txt');
     }
 
     /**

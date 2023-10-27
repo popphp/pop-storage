@@ -428,6 +428,110 @@ class Azure extends AbstractAdapter
     }
 
     /**
+     * Copy file to a location external to the current location
+     *
+     * @param  string $sourceFile
+     * @param  string $externalFile
+     * @return void
+     */
+    public function copyFileToExternal(string $sourceFile, string $externalFile): void
+    {
+        $sourceFileInfo = $this->fetchFileInfo($sourceFile);
+
+        if (is_array($sourceFileInfo) && isset($sourceFileInfo['headers']) &&
+            isset($sourceFileInfo['headers']['Content-Type']) && (!$sourceFileInfo['isError'])) {
+            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $sourceFile : $sourceFile;
+
+            if ($this->baseDirectory !== $this->directory) {
+                $directory = str_replace($this->baseDirectory, '', $this->directory);
+                if (str_ends_with($directory, '/')) {
+                    $directory = substr($directory, 0, -1);
+                }
+                $sourceUri = $directory . $sourceUri;
+            }
+
+            $this->initClient('PUT', [
+                'content-length'   => $sourceFileInfo['headers']['Content-Length'],
+                'x-ms-copy-source' => $this->auth->getBaseUri() . $sourceUri,
+            ]);
+            $this->client->getRequest()->setUri($externalFile);
+            $this->auth->signRequest($this->client->getRequest());
+            $this->client->send();
+        }
+    }
+
+    /**
+     * Copy file from a location external to the current location
+     *
+     * @param  string $externalFile
+     * @param  string $destFile
+     * @return void
+     */
+    public function copyFileFromExternal(string $externalFile, string $destFile): void
+    {
+        $this->initClient('HEAD', [], false);
+        $this->client->getRequest()->setUri($externalFile);
+        $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
+
+        if (($response->isSuccess()) && ($response->hasHeader('Content-Length'))) {
+            $destUri = (!str_starts_with($destFile, '/')) ? '/' . $destFile : $destFile;
+
+            if ($this->baseDirectory !== $this->directory) {
+                $directory = str_replace($this->baseDirectory, '', $this->directory);
+                if (str_ends_with($directory, '/')) {
+                    $directory = substr($directory, 0, -1);
+                }
+                $destUri   = $directory . $destUri;
+            }
+
+            $this->initClient('PUT', [
+                'content-length'   => $response->getHeader('Content-Length')->getValueAsString(),
+                'x-ms-copy-source' => $this->auth->getBaseUri() . $externalFile,
+            ]);
+            $this->client->getRequest()->setUri($destUri);
+            $this->auth->signRequest($this->client->getRequest());
+            $this->client->send();
+        }
+    }
+
+    /**
+     * Move file to a location external to the current location
+     *
+     * @param  string $sourceFile
+     * @param  string $externalFile
+     * @return void
+     */
+    public function moveFileToExternal(string $sourceFile, string $externalFile): void
+    {
+        $this->copyFileToExternal($sourceFile, $externalFile);
+        $this->deleteFile($sourceFile);
+    }
+
+    /**
+     * Move file from a location external to the current location
+     *
+     * @param  string  $externalFile
+     * @param  string  $destFile
+     * @param  ?string $snapshots ['include', 'only', null]
+     * @return void
+     */
+    public function moveFileFromExternal(string $externalFile, string $destFile, ?string $snapshots = 'include'): void
+    {
+        $this->copyFileFromExternal($externalFile, $destFile);
+
+        $headers = [];
+        if ($snapshots !== null) {
+            $headers['x-ms-delete-snapshots'] = ($snapshots == 'only') ? 'only' : 'include';
+        }
+
+        $this->initClient('DELETE', $headers);
+        $this->client->getRequest()->setUri($externalFile);
+        $this->auth->signRequest($this->client->getRequest());
+        $this->client->send();
+    }
+
+    /**
      * Rename file
      *
      * @param  string $oldFile

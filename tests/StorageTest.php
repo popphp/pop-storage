@@ -93,6 +93,44 @@ class StorageTest extends TestCase
         $this->assertTrue($storage->fileExists('test2.txt'));
     }
 
+    public function testCopyFileToExternal()
+    {
+        $storage = Storage::createLocal(__DIR__ . '/tmp/');
+        $storage->copyFileToExternal('test.txt', __DIR__ . '/tmp2/test.txt');
+        $this->assertFileExists(__DIR__ . '/tmp2/test.txt');
+        unlink(__DIR__ . '/tmp2/test.txt');
+    }
+
+    public function testCopyFileFromExternal()
+    {
+        file_put_contents(__DIR__ .'/tmp2/foo.txt', 123);
+        $storage = Storage::createLocal(__DIR__ . '/tmp/');
+        $storage->copyFileFromExternal(__DIR__ . '/tmp2/foo.txt', 'foo.txt');
+        $this->assertTrue($storage->fileExists('foo.txt'));
+        $storage->deleteFile('foo.txt');
+        unlink(__DIR__ . '/tmp2/foo.txt');
+    }
+
+    public function testMoveFileToExternal()
+    {
+        file_put_contents(__DIR__ .'/tmp/foo1.txt', 123);
+        $storage = Storage::createLocal(__DIR__ . '/tmp/');
+        $storage->moveFileToExternal('foo1.txt', __DIR__ . '/tmp2/foo1.txt');
+        $this->assertFalse($storage->fileExists('foo1.txt'));
+        $this->assertFileExists(__DIR__ . '/tmp2/foo1.txt');
+        unlink(__DIR__ . '/tmp2/foo1.txt');
+    }
+
+    public function testMoveFileFromExternal()
+    {
+        file_put_contents(__DIR__ .'/tmp2/foo.txt', 123);
+        $storage = Storage::createLocal(__DIR__ . '/tmp/');
+        $storage->moveFileFromExternal(__DIR__ . '/tmp2/foo.txt', 'foo.txt');
+        $this->assertFileDoesNotExist(__DIR__ . '/tmp2/foo.txt');
+        $this->assertTrue($storage->fileExists('foo.txt'));
+        $storage->deleteFile('foo.txt');
+    }
+
     public function testRenameFile()
     {
         $storage = Storage::createLocal(__DIR__ . '/tmp/');

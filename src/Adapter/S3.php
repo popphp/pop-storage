@@ -241,6 +241,66 @@ class S3 extends AbstractAdapter
     }
 
     /**
+     * Copy file to a location external to the current location
+     *
+     * @param  string $sourceFile
+     * @param  string $externalFile
+     * @return void
+     */
+    public function copyFileToExternal(string $sourceFile, string $externalFile): void
+    {
+        $sourceFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($sourceFile);
+        if (file_exists($sourceFile)) {
+            copy($sourceFile, $externalFile);
+        }
+    }
+
+    /**
+     * Copy file from a location external to the current location
+     *
+     * @param  string $externalFile
+     * @param  string $destFile
+     * @return void
+     */
+    public function copyFileFromExternal(string $externalFile, string $destFile): void
+    {
+        $destFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($destFile);
+        if (file_exists($externalFile)) {
+            copy($externalFile, $destFile);
+        }
+    }
+
+    /**
+     * Move file to a location external to the current location
+     *
+     * @param  string $sourceFile
+     * @param  string $externalFile
+     * @return void
+     */
+    public function moveFileToExternal(string $sourceFile, string $externalFile): void
+    {
+        $oldFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($sourceFile);
+        if (file_exists($oldFile)) {
+            rename($oldFile, $externalFile);
+        }
+    }
+
+    /**
+     * Move file from a location external to the current location
+     *
+     * @param  string $externalFile
+     * @param  string $destFile
+     * @return void
+     */
+    public function moveFileFromExternal(string $externalFile, string $destFile): void
+    {
+        $destFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($destFile);
+        if (file_exists($externalFile)) {
+            rename($externalFile, $destFile);
+        }
+    }
+
+    /**
      * Rename file
      *
      * @param  string $oldFile

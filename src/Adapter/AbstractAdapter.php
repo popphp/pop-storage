@@ -162,6 +162,43 @@ abstract class AbstractAdapter implements StorageInterface
      */
     abstract public function copyFile(string $sourceFile, string $destFile): void;
 
+
+    /**
+     * Copy file to a location external to the current location
+     *
+     * @param  string $sourceFile
+     * @param  string $externalFile
+     * @return void
+     */
+    abstract public function copyFileToExternal(string $sourceFile, string $externalFile): void;
+
+    /**
+     * Copy file from a location external to the current location
+     *
+     * @param  string $externalFile
+     * @param  string $destFile
+     * @return void
+     */
+    abstract public function copyFileFromExternal(string $externalFile, string $destFile): void;
+
+    /**
+     * Move file to a location external to the current location
+     *
+     * @param  string $sourceFile
+     * @param  string $externalFile
+     * @return void
+     */
+    abstract public function moveFileToExternal(string $sourceFile, string $externalFile): void;
+
+    /**
+     * Move file from a location external to the current location
+     *
+     * @param  string $externalFile
+     * @param  string $destFile
+     * @return void
+     */
+    abstract public function moveFileFromExternal(string $externalFile, string $destFile): void;
+
     /**
      * Rename file
      *

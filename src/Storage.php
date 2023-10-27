@@ -214,6 +214,54 @@ class Storage extends AbstractStorage
     }
 
     /**
+     * Copy file to a location external to the current location
+     *
+     * @param  string $sourceFile
+     * @param  string $externalFile
+     * @return void
+     */
+    public function copyFileToExternal(string $sourceFile, string $externalFile): void
+    {
+        $this->adapter->copyFileToExternal($sourceFile, $externalFile);
+    }
+
+    /**
+     * Copy file from a location external to the current location
+     *
+     * @param  string $externalFile
+     * @param  string $destFile
+     * @return void
+     */
+    public function copyFileFromExternal(string $externalFile, string $destFile): void
+    {
+        $this->adapter->copyFileFromExternal($externalFile, $destFile);
+    }
+
+    /**
+     * Move file to a location external to the current location
+     *
+     * @param  string $sourceFile
+     * @param  string $externalFile
+     * @return void
+     */
+    public function moveFileToExternal(string $sourceFile, string $externalFile): void
+    {
+        $this->adapter->moveFileToExternal($sourceFile, $externalFile);
+    }
+
+    /**
+     * Move file from a location external to the current location
+     *
+     * @param  string $externalFile
+     * @param  string $destFile
+     * @return void
+     */
+    public function moveFileFromExternal(string $externalFile, string $destFile): void
+    {
+        $this->adapter->moveFileFromExternal($externalFile, $destFile);
+    }
+
+    /**
      * Rename file
      *
      * @param  string $oldFile

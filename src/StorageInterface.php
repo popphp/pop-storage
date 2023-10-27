@@ -121,6 +121,44 @@ interface StorageInterface
      */
     public function copyFile(string $sourceFile, string $destFile): void;
 
+
+    /**
+     * Copy file to a location external to the current location
+     *
+     * @param  string $sourceFile
+     * @param  string $externalFile
+     * @return void
+     */
+    public function copyFileToExternal(string $sourceFile, string $externalFile): void;
+
+
+    /**
+     * Copy file from a location external to the current location
+     *
+     * @param  string $externalFile
+     * @param  string $destFile
+     * @return void
+     */
+    public function copyFileFromExternal(string $externalFile, string $destFile): void;
+
+    /**
+     * Move file to a location external to the current location
+     *
+     * @param  string $sourceFile
+     * @param  string $externalFile
+     * @return void
+     */
+    public function moveFileToExternal(string $sourceFile, string $externalFile): void;
+
+    /**
+     * Move file from a location external to the current location
+     *
+     * @param  string $externalFile
+     * @param  string $destFile
+     * @return void
+     */
+    public function moveFileFromExternal(string $externalFile, string $destFile): void;
+
     /**
      * Rename file
      *
