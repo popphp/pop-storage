@@ -96,6 +96,43 @@ $storage->copyFile('test.pdf', 'foo/test2.pdf');
 $storage->renameFile('test.pdf', 'foo/test2.pdf');
 ```
 
+##### Copy of move file from/to an external location on the same remote storage resource
+
+This allows you to copy or move files between different AWS buckets or Azure containers.
+
+```php
+// AWS example. The source file remains
+$storage->copyFileToExternal('test.pdf', 's3://other-bucket/test.pdf');
+
+// Azure example. The source file remains
+$storage->copyFileToExternal('test.pdf', '/other-bucket/test.pdf');
+```
+
+```php
+// AWS example. The source file no longer exists
+$storage->moveFileToExternal('test.pdf', 's3://other-bucket/test.pdf');
+
+// Azure example. The source file no longer exists
+$storage->moveFileToExternal('test.pdf', '/other-bucket/test.pdf');
+```
+
+```php
+// AWS example. The source file remains
+$storage->copyFileFromExternal('s3://other-bucket/test.pdf', 'test.pdf');
+
+// Azure example. The source file remains
+$storage->copyFileFromExternal('/other-bucket/test.pdf', 'test.pdf');
+```
+
+```php
+// AWS example. The source file no longer exists
+$storage->moveFileToExternal('s3://other-bucket/test.pdf', 'test.pdf');
+
+// Azure example. The source file no longer exists
+$storage->moveFileToExternal('/other-bucket/test.pdf', 'test.pdf');
+```
+
+
 ### Delete file
 
 ```php
@@ -118,7 +155,46 @@ $storage->fetchFileInfo('test.pdf');
 ### Check if file exists
 
 ```php
-if ($storage->fileExists('test.txt')) {
+if ($storage->fileExists('test.pdf')) {
     // File exists
 }
+```
+
+### Managing directories
+
+The AWS and Azure storage resources don't explicitly support "directories" or "folders." However, they
+do still allow for a "directory-like" structure in the form of "prefixes." The `pop-storage` normalizes
+that functionality into a more "directory-like" interface that allows the ability to change directories,
+make directories and remove directories.
+
+**NOTE:** The Azure storage resource doesn't allow the explicit creation or removal of empty directories.
+Instead, a new "directory" (prefix) is created automatically created with an upload file that utilizes a prefix.
+Conversely, a "directory" (prefix) is automatically removed when the last file that utilizes the prefix is deleted.
+
+```php
+$storage = Storage::createS3('s3://my-bucket', new S3\S3Client([
+    'credentials' => [
+        'key'    => 'AWS_KEY',
+        'secret' => 'AWS_SECRET',
+    ],
+    'region'  => 'AWS_REGION',
+    'version' => 'AWS_VERSION'
+]));
+
+$storage->mkdir('foo'); // Creates the bucket 's3://my-bucket/foo'
+$storage->chdir('foo'); // Points the adapter at 's3://my-bucket/foo' Any files pushed will store here.
+$storage->rmdir('foo'); // Removes the bucket and its content
+
+```
+
+### Various helper methods
+
+```php
+
+var_dump($storage->isDir('foo'));             // Returns bool
+var_dump($storage->isFile('test.pdf'));       // Returns bool
+var_dump($storage->getFileSize('test.pdf'));  // Returns filesize value as an integer
+var_dump($storage->getFileType('test.pdf'));  // Return either 'file' or 'dir'
+var_dump($storage->getFileMTime('test.pdf')); // Returns date/time value
+var_dump($storage->md5File('test.pdf'));      // Returns MD5 hash of file
 ```
