@@ -13,7 +13,7 @@ between different storage resources. Supported storage adapters are:
 - Microsoft Azure
 - Local Disk
 
-**NOTE:** - The use of enterprise storage solutions like AWS S3 and Microsoft Azure require credentials to
+**NOTE:** The use of enterprise storage solutions like AWS S3 and Microsoft Azure require credentials to
 be created in their respective administration portals. Please refer to the online documentation, guidelines
 and polices for whichever storage platform to which you are attempting to connect your application using this
 component. Please take care in granting access and assigning permissions to your application instance. Always
