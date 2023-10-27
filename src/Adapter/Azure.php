@@ -13,7 +13,6 @@
  */
 namespace Pop\Storage\Adapter;
 
-use Pop\Http\Client\Exception;
 use Pop\Storage\Adapter\Azure\Auth;
 use Pop\Http\Client;
 use Pop\Http\Client\Request;
