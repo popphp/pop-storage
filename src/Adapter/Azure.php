@@ -176,7 +176,7 @@ class Azure extends AbstractAdapter
     {
         /**
          * Azure storage doesn't allow the creation of empty "directories" (prefixes.)
-         * A new "directory" (prefix) is automatically created with an upload file that utilizes a prefix
+         * A new "directory" (prefix) is automatically created with an uploaded file that utilizes a prefix
          */
     }
 

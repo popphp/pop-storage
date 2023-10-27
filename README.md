@@ -172,7 +172,7 @@ that functionality into a more "directory-like" interface that allows the abilit
 make directories and remove directories.
 
 **NOTE:** The Azure storage resource doesn't allow the explicit creation or removal of empty directories.
-Instead, a new "directory" (prefix) is created automatically created with an upload file that utilizes a prefix.
+Instead, a new "directory" (prefix) is created automatically created with an uploaded file that utilizes a prefix.
 Conversely, a "directory" (prefix) is automatically removed when the last file that utilizes the prefix is deleted.
 
 ```php
