@@ -96,7 +96,7 @@ $storage->copyFile('test.pdf', 'foo/test2.pdf');
 $storage->renameFile('test.pdf', 'foo/test2.pdf');
 ```
 
-##### Copy of move file from/to an external location on the same remote storage resource
+### Copy of move file from/to an external location on the same remote storage resource
 
 This allows you to copy or move files between different AWS buckets or Azure containers.
 
