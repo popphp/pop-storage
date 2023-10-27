@@ -40,7 +40,7 @@
         }
     },
     "scripts": {
-        "test": "vendor/bin/phpunit --exclude skip"
+        "test": "vendor/bin/phpunit --exclude-group skip"
     },
     "extra": {
         "branch-alias": {
