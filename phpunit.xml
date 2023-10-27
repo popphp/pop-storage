@@ -19,6 +19,7 @@
     <env name="AWS_VERSION" value="latest"/>
     <env name="AZURE_NAME" value=""/>
     <env name="AZURE_KEY" value=""/>
+    <env name="AZURE_CONTAINER" value=""/>
   </php>
   <source>
     <include>
