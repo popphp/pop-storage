@@ -173,9 +173,9 @@ if ($storage->fileExists('test.pdf')) {
 ### Managing directories
 
 The AWS and Azure storage resources don't explicitly support "directories" or "folders." However, they
-do still allow for a "directory-like" structure in the form of "prefixes." The `pop-storage` normalizes
-that functionality into a more "directory-like" interface that allows the ability to change directories,
-make directories and remove directories.
+do still allow for a "directory-like" structure in the form of "prefixes." The `pop-storage` component
+normalizes that functionality into a more "directory-like" interface that allows the ability to change
+directories, make directories and remove directories.
 
 **NOTE:** The Azure storage resource doesn't allow the explicit creation or removal of empty directories.
 Instead, a new "directory" (prefix) is created automatically created with an uploaded file that utilizes a prefix.
