@@ -135,8 +135,8 @@ $storage = Storage::createLocal(__DIR__ . '/tmp/');
 
 [Top](#pop-storage)
 
-Files
------
+Working with Files
+------------------
 
 There are a number of available methods to assist in the uploading and downloading of files
 to and from the storage platform, as well as obtaining general data and information about them. 
