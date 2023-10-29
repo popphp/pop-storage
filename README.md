@@ -54,7 +54,6 @@ Quickstart
 A storage object can be created using one of the factories:
 
 ```php
-```php
 use Pop\Storage\Storage;
 
 $storage = Storage::createAzure('ACCOUNT_NAME', 'ACCOUNT_KEY', 'CONTAINER');
