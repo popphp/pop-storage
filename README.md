@@ -10,7 +10,7 @@ pop-storage
 * [Install](#install)
 * [Quickstart](#quickstart)
 * [Adapters](#adapters)
-* [Files](#files)
+* [Working with Files](#working-with-files)
 * [Directories](#directories)
 * [Helper Methods](#helper-methods)
 
