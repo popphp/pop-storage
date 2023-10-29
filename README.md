@@ -185,10 +185,24 @@ $storage->uploadFile($file);
 
 ### List Files
 
-You can list the files in the current location:
+You can list or search the files in the current location:
 
 ```php
 $files = $storage->listFiles();
+```
+
+```php
+$files = $storage->listFiles('test*');
+```
+
+```php
+$files = $storage->listFiles('*.pdf');
+```
+
+List all or search all directories and files together:
+
+```php
+$all = $storage->listAll();
 ```
 
 ### Copy or move file from one remote location to another
@@ -290,11 +304,26 @@ $storage->rmdir('foo');
 
 ### List Directories
 
-You can list the directories in the current location:
+You can list or search the directories in the current location:
 
 ```php
 $dirs = $storage->listDirs();
 ```
+
+```php
+$dirs = $storage->listDirs('foo*');
+```
+
+```php
+$dirs = $storage->listDirs('*foo/');
+```
+
+List all or search all directories and files together:
+
+```php
+$all = $storage->listAll();
+```
+
 
 [Top](#pop-storage)
 
