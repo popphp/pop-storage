@@ -120,7 +120,7 @@ $storage = Storage::createS3('AWS_BUCKET', new S3\S3Client([
 
 ### Setting up the Local adapter
 
-The local adapter allows simply management of files and folders to the local disk of the
+The local adapter allows simple management of files and folders on the local disk of the
 application using the same interface as the other adapters. This can be useful for local
 development and testing, before switching to one of the enterprise adapters for production.
 
@@ -181,6 +181,14 @@ $storage->uploadFiles($_FILES);
 // Where $file follows the $_FILES array format specified in PHP:
 // $file = ['tmp_name' => '/tmp/Hs87jdk', 'name' => 'test.pdf', 'size' => 8574, 'error' => 0]
 $storage->uploadFile($file);
+```
+
+### List Files
+
+You can list the files in the current location:
+
+```php
+$files = $storage->listFiles();
 ```
 
 ### Copy or move file from one remote location to another
@@ -278,6 +286,14 @@ $storage->chdir('foo');
 
 // Removes the bucket and its content
 $storage->rmdir('foo');
+```
+
+### List Directories
+
+You can list the directories in the current location:
+
+```php
+$dirs = $storage->listDirs();
 ```
 
 [Top](#pop-storage)
