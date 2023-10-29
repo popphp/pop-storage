@@ -197,9 +197,10 @@ class Azure extends AbstractAdapter
     /**
      * List directories
      *
+     * @param  ?string $search
      * @return array
      */
-    public function listDirs(): array
+    public function listDirs(?string $search = null): array
     {
         $dirs = [];
 
@@ -248,15 +249,20 @@ class Azure extends AbstractAdapter
             }
         }
 
+        if ($search !== null) {
+            $dirs = $this->searchFilter($dirs, $search);
+        }
+
         return $dirs;
     }
 
     /**
      * List files
      *
+     * @param  ?string $search
      * @return array
      */
-    public function listFiles(): array
+    public function listFiles(?string $search = null): array
     {
         $files = [];
 
@@ -288,6 +294,10 @@ class Azure extends AbstractAdapter
                     }
                 }
             }
+        }
+
+        if ($search !== null) {
+            $files = $this->searchFilter($files, $search);
         }
 
         return $files;

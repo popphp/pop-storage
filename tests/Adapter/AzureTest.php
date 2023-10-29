@@ -299,6 +299,14 @@ class AzureTest extends TestCase
     /**
      * @group skip
      */
+    public function testListFilesSearch()
+    {
+        $this->assertTrue(is_array($this->storage->listFiles('uploaded.txt')));
+    }
+
+    /**
+     * @group skip
+     */
     public function testDeleteFile()
     {
         $this->assertTrue($this->storage->fileExists('uploaded.txt'));
@@ -324,6 +332,14 @@ class AzureTest extends TestCase
     {
         $this->assertEquals('dir', $this->storage->getFileType('foo'));
         $this->assertFalse($this->storage->getFileType('bad'));
+    }
+
+    /**
+     * @group skip
+     */
+    public function testListDirsSearch()
+    {
+        $this->assertTrue(is_array($this->storage->listDirs('*foo/')));
     }
 
     /**

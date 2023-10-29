@@ -56,29 +56,45 @@ class Local extends AbstractAdapter
     /**
      * List directories
      *
+     * @param  ?string $search
      * @return array
      */
-    public function listDirs(): array
+    public function listDirs(?string $search = null): array
     {
-        $directory = $this->directory;
-        return array_values(array_filter(scandir($directory), function($value) use ($directory) {
+        $directory   = $this->directory;
+        $directories =  array_map(function($value) {
+            return $value. DIRECTORY_SEPARATOR;
+        }, array_values(array_filter(scandir($directory), function($value) use ($directory) {
             return (($value != '.') && ($value != '..') && file_exists($directory . DIRECTORY_SEPARATOR . $value) &&
                 is_dir($directory . DIRECTORY_SEPARATOR . $value));
-        }));
+        })));
+
+        if ($search !== null) {
+            $directories = $this->searchFilter($directories, $search);
+        }
+
+        return $directories;
     }
 
     /**
      * List files
      *
+     * @param  ?string $search
      * @return array
      */
-    public function listFiles(): array
+    public function listFiles(?string $search = null): array
     {
         $directory = $this->directory;
-        return array_values(array_filter(scandir($directory), function($value) use ($directory) {
+        $files     = array_values(array_filter(scandir($directory), function($value) use ($directory) {
             return (($value != '.') && ($value != '..') && file_exists($directory . DIRECTORY_SEPARATOR . $value) &&
                 !is_dir($directory . DIRECTORY_SEPARATOR . $value) && is_file($directory . DIRECTORY_SEPARATOR . $value));
         }));
+
+        if ($search !== null) {
+            $files = $this->searchFilter($files, $search);
+        }
+
+        return $files;
     }
 
     /**

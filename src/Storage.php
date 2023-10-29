@@ -134,23 +134,36 @@ class Storage extends AbstractStorage
     }
 
     /**
-     * List directories
+     * List all
      *
+     * @param  ?string $search
      * @return array
      */
-    public function listDirs(): array
+    public function listAll(?string $search = null): array
     {
-        return $this->adapter->listDirs();
+        return $this->adapter->listAll($search);
+    }
+
+    /**
+     * List directories
+     *
+     * @param  ?string $search
+     * @return array
+     */
+    public function listDirs(?string $search = null): array
+    {
+        return $this->adapter->listDirs($search);
     }
 
     /**
      * List files
      *
+     * @param  ?string $search
      * @return array
      */
-    public function listFiles(): array
+    public function listFiles(?string $search = null): array
     {
-        return $this->adapter->listFiles();
+        return $this->adapter->listFiles($search);
     }
 
     /**

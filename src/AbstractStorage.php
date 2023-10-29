@@ -123,18 +123,28 @@ abstract class AbstractStorage implements StorageInterface
     abstract public function rmdir(string $directory): void;
 
     /**
-     * List directories
+     * List all
      *
+     * @param  ?string $search
      * @return array
      */
-    abstract public function listDirs(): array;
+    abstract public function listAll(?string $search = null): array;
+
+    /**
+     * List directories
+     *
+     * @param  ?string $search
+     * @return array
+     */
+    abstract public function listDirs(?string $search = null): array;
 
     /**
      * List files
      *
+     * @param  ?string $search
      * @return array
      */
-    abstract public function listFiles(): array;
+    abstract public function listFiles(?string $search = null): array;
 
     /**
      * Put file

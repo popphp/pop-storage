@@ -283,6 +283,14 @@ class S3Test extends TestCase
     /**
      * @group skip
      */
+    public function testListFilesSearch()
+    {
+        $this->assertTrue(is_array($this->storage->listFiles('uploaded.txt')));
+    }
+
+    /**
+     * @group skip
+     */
     public function testDeleteFile()
     {
         $this->assertTrue($this->storage->fileExists('/uploaded.txt'));
@@ -314,6 +322,14 @@ class S3Test extends TestCase
     public function testListDirs()
     {
         $this->assertTrue(is_array($this->storage->listDirs()));
+    }
+
+    /**
+     * @group skip
+     */
+    public function testListDirsSearch()
+    {
+        $this->assertTrue(is_array($this->storage->listDirs('*test/')));
     }
 
     /**

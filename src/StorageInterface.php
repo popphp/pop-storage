@@ -73,18 +73,28 @@ interface StorageInterface
     public function rmdir(string $directory): void;
 
     /**
-     * List directories
+     * List all
      *
+     * @param  ?string $search
      * @return array
      */
-    public function listDirs(): array;
+    public function listAll(?string $search = null): array;
+
+    /**
+     * List directories
+     *
+     * @param  ?string $search
+     * @return array
+     */
+    public function listDirs(?string $search = null): array;
 
     /**
      * List files
      *
+     * @param  ?string $search
      * @return array
      */
-    public function listFiles(): array;
+    public function listFiles(?string $search = null): array;
 
     /**
      * Put file

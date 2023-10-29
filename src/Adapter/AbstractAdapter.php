@@ -114,18 +114,31 @@ abstract class AbstractAdapter implements StorageInterface
     abstract public function rmdir(string $directory): void;
 
     /**
-     * List directories
+     * List all
      *
+     * @param  ?string $search
      * @return array
      */
-    abstract public function listDirs(): array;
+    function listAll(?string $search = null): array
+    {
+        return array_merge($this->listDirs($search), $this->listFiles($search));
+    }
+
+    /**
+     * List directories
+     *
+     * @param  ?string $search
+     * @return array
+     */
+    abstract public function listDirs(?string $search = null): array;
 
     /**
      * List files
      *
+     * @param  ?string $search
      * @return array
      */
-    abstract public function listFiles(): array;
+    abstract public function listFiles(?string $search = null): array;
 
     /**
      * Put file
@@ -312,6 +325,34 @@ abstract class AbstractAdapter implements StorageInterface
         }
 
         return $value;
+    }
+
+    /**
+     * Search and filter values
+     *
+     * @param  array  $objects
+     * @param  string $search
+     * @return array
+     */
+    protected function searchFilter(array $objects, string $search): array
+    {
+        if (str_starts_with($search, '*')) {
+            $search  = substr($search, 1);
+            $objects = array_filter($objects, function ($value) use ($search) {
+                return str_ends_with($value, $search);
+            });
+        } else if (str_ends_with($search, '*')) {
+            $search  = substr($search, 0, -1);
+            $objects = array_filter($objects, function ($value) use ($search) {
+                return str_starts_with($value, $search);
+            });
+        } else {
+            $objects = array_filter($objects, function ($value) use ($search) {
+                return ($value == $search);
+            });
+        }
+
+        return $objects;
     }
 
 }

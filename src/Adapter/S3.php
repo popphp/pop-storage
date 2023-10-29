@@ -125,9 +125,10 @@ class S3 extends AbstractAdapter
     /**
      * List directories
      *
+     * @param  ?string $search
      * @return array
      */
-    public function listDirs(): array
+    public function listDirs(?string $search = null): array
     {
         $dirs   = [];
         $params = ['Bucket' => str_replace('s3://', '', $this->baseDirectory)];
@@ -148,6 +149,10 @@ class S3 extends AbstractAdapter
             }
         }
 
+        if ($search !== null) {
+            $dirs = $this->searchFilter($dirs, $search);
+        }
+
         return $dirs;
 
     }
@@ -155,9 +160,10 @@ class S3 extends AbstractAdapter
     /**
      * List files
      *
+     * @param  ?string $search
      * @return array
      */
-    public function listFiles(): array
+    public function listFiles(?string $search = null): array
     {
         $files   = [];
         $params  = ['Bucket' => str_replace('s3://', '', $this->baseDirectory), 'Delimiter' => '/'];
@@ -173,6 +179,10 @@ class S3 extends AbstractAdapter
                 $files[] = (isset($params['Prefix']) && str_starts_with($object['Key'], $params['Prefix'])) ?
                     substr($object['Key'], strlen($params['Prefix'])) : $object['Key'];
             }
+        }
+
+        if ($search !== null) {
+            $files = $this->searchFilter($files, $search);
         }
 
         return $files;

@@ -46,12 +46,21 @@ class StorageTest extends TestCase
         $this->assertTrue(is_array($info));
     }
 
+    public function testListAll()
+    {
+        $storage = Storage::createLocal(__DIR__ . '/tmp/');
+        $all    = $storage->listAll();
+        $this->assertTrue(is_array($all));
+        $this->assertTrue(in_array('foo/', $all));
+        $this->assertTrue(in_array('test.txt', $all));
+    }
+
     public function testListDirs()
     {
         $storage = Storage::createLocal(__DIR__ . '/tmp/');
         $dirs    = $storage->listDirs();
         $this->assertTrue(is_array($dirs));
-        $this->assertTrue(in_array('foo', $dirs));
+        $this->assertTrue(in_array('foo/', $dirs));
     }
 
     public function testListFiles()
@@ -60,6 +69,33 @@ class StorageTest extends TestCase
         $files   = $storage->listFiles();
         $this->assertTrue(is_array($files));
         $this->assertTrue(in_array('test.txt', $files));
+    }
+
+    public function testListSearch1()
+    {
+        $storage = Storage::createLocal(__DIR__ . '/tmp/');
+        $all    = $storage->listAll('test*');
+        $this->assertTrue(is_array($all));
+        $this->assertFalse(in_array('foo/', $all));
+        $this->assertTrue(in_array('test.txt', $all));
+    }
+
+    public function testListSearch2()
+    {
+        $storage = Storage::createLocal(__DIR__ . '/tmp/');
+        $all    = $storage->listAll('*foo/');
+        $this->assertTrue(is_array($all));
+        $this->assertTrue(in_array('foo/', $all));
+        $this->assertFalse(in_array('test.txt', $all));
+    }
+
+    public function testListSearch3()
+    {
+        $storage = Storage::createLocal(__DIR__ . '/tmp/');
+        $all    = $storage->listAll('test.txt');
+        $this->assertTrue(is_array($all));
+        $this->assertFalse(in_array('foo/', $all));
+        $this->assertTrue(in_array('test.txt', $all));
     }
 
     public function testUploadFiles()
