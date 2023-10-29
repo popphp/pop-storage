@@ -65,7 +65,7 @@ Then a local file can be uploaded to the storage platform:
 $storage->putFile('test.pdf');
 ```
 
-Or, a remove file can be downloaded from the storage platform, which will return the
+Or, a remote file can be downloaded from the storage platform, which will return the
 file contents to be utilized within the application:
 
 ```php
