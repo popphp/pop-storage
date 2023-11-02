@@ -82,7 +82,7 @@ Adapters
 --------
 
 By default, there are 3 available adapters. All of the adapters share the same interface and
-are interchangeable. Other adapters can be created, as long as they use the same
+are interchangeable. Other adapters can be created, as long as they implement the same
 `Pop\Storage\StorageInterface`.
 
 ### AWS S3
