@@ -11,6 +11,9 @@ pop-storage
 * [Install](#install)
 * [Quickstart](#quickstart)
 * [Adapters](#adapters)
+    - [AWS S3](#aws-s3)
+    - [Microsoft Azure](#microsoft-azure)
+    - [Local Disk](#local-disk)
 * [Working with Files](#working-with-files)
 * [Directories](#directories)
 * [Helper Methods](#helper-methods)
@@ -80,25 +83,10 @@ Adapters
 
 All of the adapters share the same interface and are interchangeable.
 
-### Setting up the Azure adapter
+### AWS S3
 
-The Azure adapter interfaces with Microsoft Azure Storage and requires the following credentials
+The Amazon AWS S3 adapter interfaces with AWS S3 and requires the following credentials
 and access information to be obtained from the AWS administration console:
-
-- Account Name
-- Account Key
-- The Azure container to access (in the format `container`)
-
-```php
-use Pop\Storage\Storage;
-
-$storage = Storage::createAzure('ACCOUNT_NAME', 'ACCOUNT_KEY', 'CONTAINER');
-```
-
-### Setting up the S3 adapter
-
-The S3 adapter interfaces with AWS S3 and requires the following credentials and access
-information to be obtained from the AWS administration console:
 
 - AWS Key
 - AWS Secret
@@ -119,9 +107,24 @@ $storage = Storage::createS3('AWS_BUCKET', new S3\S3Client([
 ]));
 ```
 
-### Setting up the Local adapter
+### Microsoft Azure
 
-The local adapter allows simple management of files and folders on the local disk of the
+The Microsoft Azure adapter interfaces with Microsoft Azure Storage and requires the following credentials
+and access information to be obtained from the AWS administration console:
+
+- Account Name
+- Account Key
+- The Azure container to access (in the format `container`)
+
+```php
+use Pop\Storage\Storage;
+
+$storage = Storage::createAzure('ACCOUNT_NAME', 'ACCOUNT_KEY', 'CONTAINER');
+```
+
+### Local Disk
+
+The local disk adapter allows simple management of files and folders on the local disk of the
 application using the same interface as the other adapters. This can be useful for local
 development and testing, before switching to one of the enterprise adapters for production.
 
