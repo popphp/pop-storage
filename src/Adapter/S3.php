@@ -466,8 +466,8 @@ class S3 extends AbstractAdapter
     {
         if (file_exists($this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename))) {
             $fileObject = $this->client->getObject([
-                'Bucket' => str_replace('s3://', '', $this->directory),
-                'Key'    => $this->scrub($filename),
+                'Bucket' => str_replace('s3://', '', $this->baseDirectory),
+                'Key'    => str_replace($this->baseDirectory . '/', '', $this->directory . '/') . $this->scrub($filename),
             ]);
 
             return (isset($fileObject['ETag'])) ? str_replace('"', '', $fileObject['ETag']) : false;
