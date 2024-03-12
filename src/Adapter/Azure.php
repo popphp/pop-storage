@@ -26,7 +26,7 @@ use Pop\Utils\File;
  * @author     Nick Sagona, III <dev@nolainteractive.com>
  * @copyright  Copyright (c) 2009-2024 NOLA Interactive, LLC. (http://www.nolainteractive.com)
  * @license    http://www.popphp.org/license     New BSD License
- * @version    2.0.0
+ * @version    2.1.0
  */
 class Azure extends AbstractAdapter
 {
@@ -82,7 +82,7 @@ class Azure extends AbstractAdapter
         $request->addHeader('Date', gmdate('D, d M Y H:i:s T'))
             ->addHeader('Host', $this->auth->getAccountName() . '.blob.core.windows.net')
             ->addHeader('Content-Type', Client\Request::URLFORM)
-            ->addHeader('User-Agent', 'pop-storage/2.0.0 (PHP ' . PHP_VERSION . ')/' . PHP_OS)
+            ->addHeader('User-Agent', 'pop-storage/2.1.0 (PHP ' . PHP_VERSION . ')/' . PHP_OS)
             ->addHeader('x-ms-client-request-id', uniqid())
             ->addHeader('x-ms-version', '2023-11-03');
 
