@@ -4,7 +4,6 @@ pop-storage
 [![Build Status](https://github.com/popphp/pop-storage/workflows/phpunit/badge.svg)](https://github.com/popphp/pop-storage/actions)
 [![Coverage Status](http://cc.popphp.org/coverage.php?comp=pop-storage)](http://cc.popphp.org/pop-storage/)
 
-[![Join the chat at https://popphp.slack.com](https://media.popphp.org/img/slack.svg)](https://popphp.slack.com)
 [![Join the chat at https://discord.gg/TZjgT74U7E](https://media.popphp.org/img/discord.svg)](https://discord.gg/TZjgT74U7E)
 
 * [Overview](#overview)
@@ -33,7 +32,7 @@ guidelines and polices for whichever storage platform to which you are attemptin
 using this component. Please take care in granting access and assigning permissions to your application instance.
 Always follow the recommended security policies and guidelines of your chosen storage platform.
 
-`pop-storage` is a component of the [Pop PHP Framework](http://www.popphp.org/).
+`pop-storage` is a component of the [Pop PHP Framework](https://www.popphp.org/).
 
 [Top](#pop-storage)
 
@@ -47,7 +46,7 @@ Install `pop-storage` using Composer.
 Or, require it in your composer.json file
 
     "require": {
-        "popphp/pop-storage" : "^2.0.0"
+        "popphp/pop-storage" : "^2.1.0"
     }
 
 [Top](#pop-storage)
