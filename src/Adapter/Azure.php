@@ -84,7 +84,7 @@ class Azure extends AbstractAdapter
             ->addHeader('Content-Type', Client\Request::URLENCODED)
             ->addHeader('User-Agent', 'pop-storage/2.1.0 (PHP ' . PHP_VERSION . ')/' . PHP_OS)
             ->addHeader('x-ms-client-request-id', uniqid())
-            ->addHeader('x-ms-version', '2023-11-03');
+            ->addHeader('x-ms-version', '2025-01-05');
 
         if (!empty($headers)) {
             foreach ($headers as $header => $value) {
@@ -206,14 +206,22 @@ class Azure extends AbstractAdapter
 
         if ($this->baseDirectory == $this->directory) {
             $this->initClient();
-            $this->client->getRequest()->setQuery(['comp' => 'list']);
+            $this->client->setQuery(['comp' => 'list']);
             $this->auth->signRequest($this->client->getRequest());
 
             $response = $this->client->send();
 
             if (is_array($response) && !empty($response['Containers'])) {
                 foreach ($response['Containers'] as $container) {
-                    $dirs[] = $container['Name'];
+                    if (isset($container[0])) {
+                        foreach ($container as $cont) {
+                            if (isset($cont['Name'])) {
+                                $dirs[] = $cont['Name'];
+                            }
+                        }
+                    } else if (isset($container['Name'])) {
+                        $dirs[] = $container['Name'];
+                    }
                 }
             }
         } else {
