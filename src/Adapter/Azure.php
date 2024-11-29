@@ -26,7 +26,7 @@ use Pop\Utils\File;
  * @author     Nick Sagona, III <dev@noladev.com>
  * @copyright  Copyright (c) 2009-2025 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
- * @version    2.0.0
+ * @version    2.1.0
  */
 class Azure extends AbstractAdapter
 {
@@ -81,8 +81,8 @@ class Azure extends AbstractAdapter
         $request = new Request('/', $method);
         $request->addHeader('Date', gmdate('D, d M Y H:i:s T'))
             ->addHeader('Host', $this->auth->getAccountName() . '.blob.core.windows.net')
-            ->addHeader('Content-Type', Client\Request::URLFORM)
-            ->addHeader('User-Agent', 'pop-storage/2.0.0 (PHP ' . PHP_VERSION . ')/' . PHP_OS)
+            ->addHeader('Content-Type', Client\Request::URLENCODED)
+            ->addHeader('User-Agent', 'pop-storage/2.1.0 (PHP ' . PHP_VERSION . ')/' . PHP_OS)
             ->addHeader('x-ms-client-request-id', uniqid())
             ->addHeader('x-ms-version', '2023-11-03');
 
@@ -314,7 +314,7 @@ class Azure extends AbstractAdapter
     public function putFile(string $fileFrom, bool $copy = true): void
     {
         if (file_exists($fileFrom)) {
-            $uri = '/' . basename($fileFrom);
+            $uri = '/' . $this->baseDirectory . '/' . basename($fileFrom);
             if ($this->baseDirectory !== $this->directory) {
                 $directory = str_replace($this->baseDirectory, '', $this->directory);
                 if (str_ends_with($directory, '/')) {
@@ -346,7 +346,7 @@ class Azure extends AbstractAdapter
      */
     public function putFileContents(string $filename, string $fileContents): void
     {
-        $uri = '/' . $filename;
+        $uri = '/' . $this->baseDirectory . '/' . $filename;
         if ($this->baseDirectory !== $this->directory) {
             $directory = str_replace($this->baseDirectory, '', $this->directory);
             if (str_ends_with($directory, '/')) {
@@ -379,7 +379,7 @@ class Azure extends AbstractAdapter
             throw new Exception('Error: The uploaded file array was not valid');
         }
         if (file_exists($file['tmp_name'])) {
-            $uri = '/' . $file['name'];
+            $uri = '/' . $this->baseDirectory . '/' . $file['name'];
             if ($this->baseDirectory !== $this->directory) {
                 $directory = str_replace($this->baseDirectory, '', $this->directory);
                 if (str_ends_with($directory, '/')) {
@@ -415,8 +415,8 @@ class Azure extends AbstractAdapter
 
         if (is_array($sourceFileInfo) && isset($sourceFileInfo['headers']) &&
             isset($sourceFileInfo['headers']['Content-Type']) && (!$sourceFileInfo['isError'])) {
-            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $sourceFile : $sourceFile;
-            $destUri   = (!str_starts_with($destFile, '/')) ? '/' . $destFile : $destFile;
+            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $this->baseDirectory . '/' . $sourceFile : $sourceFile;
+            $destUri   = (!str_starts_with($destFile, '/')) ? '/' . $this->baseDirectory . '/' . $destFile : $destFile;
 
             if ($this->baseDirectory !== $this->directory) {
                 $directory = str_replace($this->baseDirectory, '', $this->directory);
@@ -450,7 +450,7 @@ class Azure extends AbstractAdapter
 
         if (is_array($sourceFileInfo) && isset($sourceFileInfo['headers']) &&
             isset($sourceFileInfo['headers']['Content-Type']) && (!$sourceFileInfo['isError'])) {
-            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $sourceFile : $sourceFile;
+            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $this->baseDirectory . '/' . $sourceFile : $sourceFile;
 
             if ($this->baseDirectory !== $this->directory) {
                 $directory = str_replace($this->baseDirectory, '', $this->directory);
@@ -485,7 +485,7 @@ class Azure extends AbstractAdapter
         $response = $this->client->send();
 
         if (($response->isSuccess()) && ($response->hasHeader('Content-Length'))) {
-            $destUri = (!str_starts_with($destFile, '/')) ? '/' . $destFile : $destFile;
+            $destUri = (!str_starts_with($destFile, '/')) ? '/' . $this->baseDirectory . '/' . $destFile : $destFile;
 
             if ($this->baseDirectory !== $this->directory) {
                 $directory = str_replace($this->baseDirectory, '', $this->directory);
@@ -575,7 +575,7 @@ class Azure extends AbstractAdapter
      */
     public function deleteFile(string $filename, ?string $snapshots = 'include'): void
     {
-        $uri = '/' . $filename;
+        $uri = '/' . $this->baseDirectory . '/' . $filename;
         if ($this->baseDirectory !== $this->directory) {
             $directory = str_replace($this->baseDirectory, '', $this->directory);
             if (str_ends_with($directory, '/')) {
@@ -604,7 +604,7 @@ class Azure extends AbstractAdapter
      */
     public function fetchFile(string $filename, bool $raw = true): mixed
     {
-        $filename = (!str_starts_with($filename, '/')) ? '/' . $filename : $filename;
+        $filename = (!str_starts_with($filename, '/')) ? '/' . $this->baseDirectory . '/' . $filename : $filename;
 
         if ($this->baseDirectory !== $this->directory) {
             $directory = str_replace($this->baseDirectory, '', $this->directory);
@@ -634,7 +634,7 @@ class Azure extends AbstractAdapter
      */
     public function fetchFileInfo(string $filename): array
     {
-        $filename = (!str_starts_with($filename, '/')) ? '/' . $filename : $filename;
+        $filename = (!str_starts_with($filename, '/')) ? '/' . $this->baseDirectory . '/' . $filename : $filename;
 
         if ($this->baseDirectory !== $this->directory) {
             $directory = str_replace($this->baseDirectory, '', $this->directory);
