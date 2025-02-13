@@ -204,54 +204,33 @@ class Azure extends AbstractAdapter
     {
         $dirs = [];
 
-        if ($this->baseDirectory == $this->directory) {
-            $this->initClient();
-            $this->client->setQuery(['comp' => 'list']);
-            $this->auth->signRequest($this->client->getRequest());
+        $uri = '/' . $this->baseDirectory;
 
-            $response = $this->client->send();
+        $params = ['restype' => 'container', 'comp' => 'list'];
 
-            if (is_array($response) && !empty($response['Containers'])) {
-                foreach ($response['Containers'] as $container) {
-                    if (isset($container[0])) {
-                        foreach ($container as $cont) {
-                            if (isset($cont['Name'])) {
-                                $dirs[] = $cont['Name'];
-                            }
-                        }
-                    } else if (isset($container['Name'])) {
-                        $dirs[] = $container['Name'];
-                    }
-                }
+        if ($this->baseDirectory !== $this->directory) {
+            $directory = str_replace($this->baseDirectory, '', $this->directory);
+            if (str_ends_with($directory, '/')) {
+                $directory = substr($directory, 0, -1);
             }
-        } else {
-            $container = str_replace($this->baseDirectory, '', $this->directory);
+            $params['prefix'] = $directory;
+        }
 
-            $params = ['restype' => 'container', 'comp' => 'list'];
-            if (substr_count($container, '/') > 1) {
-                $folders          = array_filter(explode('/', $container));
-                $container        = '/' . array_shift($folders);
-                $params['prefix'] = implode('/', $folders) . '/';
-            }
+        $this->initClient();
+        $this->client->getRequest()->setQuery($params);
+        $this->client->getRequest()->setUri($uri);
+        $this->auth->signRequest($this->client->getRequest());
 
-            $this->initClient();
-            $this->client->getRequest()->setQuery($params);
-            $this->client->getRequest()->setUri($container);
-            $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
 
-            $response = $this->client->send();
-
-            if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
-                $blobs = (!isset($response['Blobs']['Blob'][0])) ?
-                    [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
-                foreach ($blobs as $blob) {
-                    $name = (isset($params['prefix']) && str_starts_with($blob['Name'], $params['prefix'])) ?
-                        substr($blob['Name'], strlen($params['prefix'])) : $blob['Name'];
-                    if (!empty($name) && (substr_count($name, '/') >= 1)) {
-                        $folder = substr($name, 0, (strpos($name, '/') + 1));
-                        if (!in_array($folder, $dirs)) {
-                            $dirs[] = $folder;
-                        }
+        if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
+            $blobs = (!isset($response['Blobs']['Blob'][0])) ? [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
+            foreach ($blobs as $blob) {
+                if (isset($blob['Properties']) && isset($blob['Properties']['ResourceType']) &&
+                    ($blob['Properties']['ResourceType'] == 'directory')) {
+                    if ((!isset($params['prefix']) && !str_contains($blob['Name'], '/')) ||
+                        (isset($params['prefix']) && str_contains($blob['Name'], '/'))) {
+                        $dirs[] = $blob['Name'];
                     }
                 }
             }
@@ -274,31 +253,33 @@ class Azure extends AbstractAdapter
     {
         $files = [];
 
+        $uri = '/' . $this->baseDirectory;
+
+        $params = ['restype' => 'container', 'comp' => 'list'];
+
         if ($this->baseDirectory !== $this->directory) {
-            $container = str_replace($this->baseDirectory, '', $this->directory);
-
-            $params = ['restype' => 'container', 'comp' => 'list'];
-            if (substr_count($container, '/') > 1) {
-                $folders          = array_filter(explode('/', $container));
-                $container        = '/' . array_shift($folders);
-                $params['prefix'] = implode('/', $folders) . '/';
+            $directory = str_replace($this->baseDirectory, '', $this->directory);
+            if (str_ends_with($directory, '/')) {
+                $directory = substr($directory, 0, -1);
             }
+            $params['prefix'] = $directory;
+        }
 
-            $this->initClient();
-            $this->client->getRequest()->setQuery($params);
-            $this->client->getRequest()->setUri($container);
-            $this->auth->signRequest($this->client->getRequest());
+        $this->initClient();
+        $this->client->getRequest()->setQuery($params);
+        $this->client->getRequest()->setUri($uri);
+        $this->auth->signRequest($this->client->getRequest());
 
-            $response = $this->client->send();
+        $response = $this->client->send();
 
-            if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
-                $blobs = (!isset($response['Blobs']['Blob'][0])) ?
-                    [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
-                foreach ($blobs as $blob) {
-                    $name = (isset($params['prefix']) && str_starts_with($blob['Name'], $params['prefix'])) ?
-                        substr($blob['Name'], strlen($params['prefix'])) : $blob['Name'];
-                    if (!empty($name) && !str_contains($name, '/')) {
-                        $files[] = $name;
+        if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
+            $blobs = (!isset($response['Blobs']['Blob'][0])) ? [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
+            foreach ($blobs as $blob) {
+                if (isset($blob['Properties']) && isset($blob['Properties']['ResourceType']) &&
+                    ($blob['Properties']['ResourceType'] == 'file')) {
+                    if ((!isset($params['prefix']) && !str_contains($blob['Name'], '/')) ||
+                        (isset($params['prefix']) && str_contains($blob['Name'], '/'))) {
+                        $files[] = $blob['Name'];
                     }
                 }
             }
@@ -691,25 +672,9 @@ class Azure extends AbstractAdapter
         if (str_ends_with($directory, '/')) {
             $directory = substr($directory, 0, -1);
         }
-
-        $directories  = explode('/', $directory);
-        $result       = false;
-        $curDirectory = $this->directory;
-        $dirString    = substr(str_replace($this->baseDirectory, '', $this->directory), 1) . '/';
-        foreach ($directories as $directory) {
-            $dirs       = $this->listDirs();
-            $dirString .= $directory . '/';
-            if (in_array($directory . '/', $dirs)) {
-                $result = true;
-            } else {
-                $result = false;
-            }
-            $this->chdir($dirString);
-        }
-
-        $this->directory = $curDirectory;
-
-        return $result;
+        $info = $this->fetchFileInfo($directory);
+        return (isset($info['headers']) && isset($info['headers']['x-ms-resource-type']) &&
+            $info['headers']['x-ms-resource-type'] == 'directory');
     }
 
     /**
@@ -720,7 +685,9 @@ class Azure extends AbstractAdapter
      */
     public function isFile(string $filename): bool
     {
-        return $this->fileExists($filename);
+        $info = $this->fetchFileInfo($filename);
+        return (isset($info['headers']) && isset($info['headers']['x-ms-resource-type']) &&
+            $info['headers']['x-ms-resource-type'] == 'file');
     }
 
     /**
