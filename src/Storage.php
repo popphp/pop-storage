@@ -64,7 +64,8 @@ class Storage extends AbstractStorage
     {
         $azure = new self(Adapter\Azure::create($accountName, $accountKey));
         if ($container != null) {
-            $azure->chdir($container);
+            $azure->setBaseDir($container);
+            $azure->chdir();
         }
         return $azure;
     }
@@ -407,5 +408,5 @@ class Storage extends AbstractStorage
     {
         return $this->adapter->md5File($filename);
     }
-    
+
 }

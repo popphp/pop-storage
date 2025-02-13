@@ -60,9 +60,11 @@ class Auth extends AbstractAuth
      */
     public function signRequest(Request $request): Request
     {
+        $queryParams = ($request->hasQuery()) ? $request->getQuery()->toArray() : [];
+
         $signedKey = $this->getAuthorizationHeader(
             self::formatHeaders($request->getHeadersAsArray()), $request->getUriAsString(),
-            $request->getQuery(), $request->getMethod()
+            $queryParams, $request->getMethod()
         );
 
         return $request->addHeader('authorization', $signedKey);
@@ -82,8 +84,8 @@ class Auth extends AbstractAuth
         $signature = $this->computeSignature($headers, $url, $queryParams, $httpMethod);
 
         return 'SharedKey ' . $this->accountName . ':' . base64_encode(
-                hash_hmac('sha256', $signature, base64_decode($this->accountKey), true)
-            );
+            hash_hmac('sha256', $signature, base64_decode($this->accountKey), true)
+        );
     }
 
     /**

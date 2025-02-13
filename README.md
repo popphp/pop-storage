@@ -117,6 +117,9 @@ and access information to be obtained from the AWS administration console:
 - Account Key
 - The Azure container to access (in the format `container`)
 
+**Note:** The container should be configured to have "hierarchical namespace" support turned on for better
+support with filenames and folders.
+
 ```php
 use Pop\Storage\Storage;
 

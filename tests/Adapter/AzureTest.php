@@ -10,7 +10,7 @@ class AzureTest extends TestCase
 {
 
     protected $storage = null;
-    
+
     protected $storage2 = null;
 
     /**
@@ -277,7 +277,7 @@ class AzureTest extends TestCase
      */
     public function testMd5File()
     {
-        $this->assertTrue(is_string($this->storage->md5File('/uploaded.txt')));
+        $this->assertTrue(is_string($this->storage->md5File('uploaded.txt')));
     }
 
     /**
@@ -285,7 +285,7 @@ class AzureTest extends TestCase
      */
     public function testMd5FileNoFile()
     {
-        $this->assertFalse($this->storage->md5File('/bad.txt'));
+        $this->assertFalse($this->storage->md5File('bad.txt'));
     }
 
     /**

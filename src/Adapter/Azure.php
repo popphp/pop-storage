@@ -81,10 +81,10 @@ class Azure extends AbstractAdapter
         $request = new Request('/', $method);
         $request->addHeader('Date', gmdate('D, d M Y H:i:s T'))
             ->addHeader('Host', $this->auth->getAccountName() . '.blob.core.windows.net')
-            ->addHeader('Content-Type', Client\Request::URLFORM)
+            ->addHeader('Content-Type', Client\Request::URLENCODED)
             ->addHeader('User-Agent', 'pop-storage/2.1.0 (PHP ' . PHP_VERSION . ')/' . PHP_OS)
             ->addHeader('x-ms-client-request-id', uniqid())
-            ->addHeader('x-ms-version', '2023-11-03');
+            ->addHeader('x-ms-version', '2025-01-05');
 
         if (!empty($headers)) {
             foreach ($headers as $header => $value) {
@@ -204,46 +204,33 @@ class Azure extends AbstractAdapter
     {
         $dirs = [];
 
-        if ($this->baseDirectory == $this->directory) {
-            $this->initClient();
-            $this->client->getRequest()->setQuery(['comp' => 'list']);
-            $this->auth->signRequest($this->client->getRequest());
+        $uri = '/' . $this->baseDirectory;
 
-            $response = $this->client->send();
+        $params = ['restype' => 'container', 'comp' => 'list'];
 
-            if (is_array($response) && !empty($response['Containers'])) {
-                foreach ($response['Containers'] as $container) {
-                    $dirs[] = $container['Name'];
-                }
+        if ($this->baseDirectory !== $this->directory) {
+            $directory = str_replace($this->baseDirectory, '', $this->directory);
+            if (str_ends_with($directory, '/')) {
+                $directory = substr($directory, 0, -1);
             }
-        } else {
-            $container = str_replace($this->baseDirectory, '', $this->directory);
+            $params['prefix'] = $directory;
+        }
 
-            $params = ['restype' => 'container', 'comp' => 'list'];
-            if (substr_count($container, '/') > 1) {
-                $folders          = array_filter(explode('/', $container));
-                $container        = '/' . array_shift($folders);
-                $params['prefix'] = implode('/', $folders) . '/';
-            }
+        $this->initClient();
+        $this->client->getRequest()->setQuery($params);
+        $this->client->getRequest()->setUri($uri);
+        $this->auth->signRequest($this->client->getRequest());
 
-            $this->initClient();
-            $this->client->getRequest()->setQuery($params);
-            $this->client->getRequest()->setUri($container);
-            $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
 
-            $response = $this->client->send();
-
-            if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
-                $blobs = (!isset($response['Blobs']['Blob'][0])) ?
-                    [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
-                foreach ($blobs as $blob) {
-                    $name = (isset($params['prefix']) && str_starts_with($blob['Name'], $params['prefix'])) ?
-                        substr($blob['Name'], strlen($params['prefix'])) : $blob['Name'];
-                    if (!empty($name) && (substr_count($name, '/') >= 1)) {
-                        $folder = substr($name, 0, (strpos($name, '/') + 1));
-                        if (!in_array($folder, $dirs)) {
-                            $dirs[] = $folder;
-                        }
+        if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
+            $blobs = (!isset($response['Blobs']['Blob'][0])) ? [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
+            foreach ($blobs as $blob) {
+                if (isset($blob['Properties']) && isset($blob['Properties']['ResourceType']) &&
+                    ($blob['Properties']['ResourceType'] == 'directory')) {
+                    if ((!isset($params['prefix']) && !str_contains($blob['Name'], '/')) ||
+                        (isset($params['prefix']) && str_contains($blob['Name'], '/'))) {
+                        $dirs[] = $blob['Name'];
                     }
                 }
             }
@@ -266,31 +253,33 @@ class Azure extends AbstractAdapter
     {
         $files = [];
 
+        $uri = '/' . $this->baseDirectory;
+
+        $params = ['restype' => 'container', 'comp' => 'list'];
+
         if ($this->baseDirectory !== $this->directory) {
-            $container = str_replace($this->baseDirectory, '', $this->directory);
-
-            $params = ['restype' => 'container', 'comp' => 'list'];
-            if (substr_count($container, '/') > 1) {
-                $folders          = array_filter(explode('/', $container));
-                $container        = '/' . array_shift($folders);
-                $params['prefix'] = implode('/', $folders) . '/';
+            $directory = str_replace($this->baseDirectory, '', $this->directory);
+            if (str_ends_with($directory, '/')) {
+                $directory = substr($directory, 0, -1);
             }
+            $params['prefix'] = $directory;
+        }
 
-            $this->initClient();
-            $this->client->getRequest()->setQuery($params);
-            $this->client->getRequest()->setUri($container);
-            $this->auth->signRequest($this->client->getRequest());
+        $this->initClient();
+        $this->client->getRequest()->setQuery($params);
+        $this->client->getRequest()->setUri($uri);
+        $this->auth->signRequest($this->client->getRequest());
 
-            $response = $this->client->send();
+        $response = $this->client->send();
 
-            if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
-                $blobs = (!isset($response['Blobs']['Blob'][0])) ?
-                    [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
-                foreach ($blobs as $blob) {
-                    $name = (isset($params['prefix']) && str_starts_with($blob['Name'], $params['prefix'])) ?
-                        substr($blob['Name'], strlen($params['prefix'])) : $blob['Name'];
-                    if (!empty($name) && !str_contains($name, '/')) {
-                        $files[] = $name;
+        if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
+            $blobs = (!isset($response['Blobs']['Blob'][0])) ? [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
+            foreach ($blobs as $blob) {
+                if (isset($blob['Properties']) && isset($blob['Properties']['ResourceType']) &&
+                    ($blob['Properties']['ResourceType'] == 'file')) {
+                    if ((!isset($params['prefix']) && !str_contains($blob['Name'], '/')) ||
+                        (isset($params['prefix']) && str_contains($blob['Name'], '/'))) {
+                        $files[] = $blob['Name'];
                     }
                 }
             }
@@ -314,7 +303,7 @@ class Azure extends AbstractAdapter
     public function putFile(string $fileFrom, bool $copy = true): void
     {
         if (file_exists($fileFrom)) {
-            $uri = '/' . basename($fileFrom);
+            $uri = '/' . $this->baseDirectory . '/' . basename($fileFrom);
             if ($this->baseDirectory !== $this->directory) {
                 $directory = str_replace($this->baseDirectory, '', $this->directory);
                 if (str_ends_with($directory, '/')) {
@@ -346,7 +335,7 @@ class Azure extends AbstractAdapter
      */
     public function putFileContents(string $filename, string $fileContents): void
     {
-        $uri = '/' . $filename;
+        $uri = '/' . $this->baseDirectory . '/' . $filename;
         if ($this->baseDirectory !== $this->directory) {
             $directory = str_replace($this->baseDirectory, '', $this->directory);
             if (str_ends_with($directory, '/')) {
@@ -379,7 +368,7 @@ class Azure extends AbstractAdapter
             throw new Exception('Error: The uploaded file array was not valid');
         }
         if (file_exists($file['tmp_name'])) {
-            $uri = '/' . $file['name'];
+            $uri = '/' . $this->baseDirectory . '/' . $file['name'];
             if ($this->baseDirectory !== $this->directory) {
                 $directory = str_replace($this->baseDirectory, '', $this->directory);
                 if (str_ends_with($directory, '/')) {
@@ -415,8 +404,8 @@ class Azure extends AbstractAdapter
 
         if (is_array($sourceFileInfo) && isset($sourceFileInfo['headers']) &&
             isset($sourceFileInfo['headers']['Content-Type']) && (!$sourceFileInfo['isError'])) {
-            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $sourceFile : $sourceFile;
-            $destUri   = (!str_starts_with($destFile, '/')) ? '/' . $destFile : $destFile;
+            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $this->baseDirectory . '/' . $sourceFile : $sourceFile;
+            $destUri   = (!str_starts_with($destFile, '/')) ? '/' . $this->baseDirectory . '/' . $destFile : $destFile;
 
             if ($this->baseDirectory !== $this->directory) {
                 $directory = str_replace($this->baseDirectory, '', $this->directory);
@@ -450,7 +439,7 @@ class Azure extends AbstractAdapter
 
         if (is_array($sourceFileInfo) && isset($sourceFileInfo['headers']) &&
             isset($sourceFileInfo['headers']['Content-Type']) && (!$sourceFileInfo['isError'])) {
-            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $sourceFile : $sourceFile;
+            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $this->baseDirectory . '/' . $sourceFile : $sourceFile;
 
             if ($this->baseDirectory !== $this->directory) {
                 $directory = str_replace($this->baseDirectory, '', $this->directory);
@@ -485,7 +474,7 @@ class Azure extends AbstractAdapter
         $response = $this->client->send();
 
         if (($response->isSuccess()) && ($response->hasHeader('Content-Length'))) {
-            $destUri = (!str_starts_with($destFile, '/')) ? '/' . $destFile : $destFile;
+            $destUri = (!str_starts_with($destFile, '/')) ? '/' . $this->baseDirectory . '/' . $destFile : $destFile;
 
             if ($this->baseDirectory !== $this->directory) {
                 $directory = str_replace($this->baseDirectory, '', $this->directory);
@@ -575,7 +564,7 @@ class Azure extends AbstractAdapter
      */
     public function deleteFile(string $filename, ?string $snapshots = 'include'): void
     {
-        $uri = '/' . $filename;
+        $uri = '/' . $this->baseDirectory . '/' . $filename;
         if ($this->baseDirectory !== $this->directory) {
             $directory = str_replace($this->baseDirectory, '', $this->directory);
             if (str_ends_with($directory, '/')) {
@@ -604,7 +593,7 @@ class Azure extends AbstractAdapter
      */
     public function fetchFile(string $filename, bool $raw = true): mixed
     {
-        $filename = (!str_starts_with($filename, '/')) ? '/' . $filename : $filename;
+        $filename = (!str_starts_with($filename, '/')) ? '/' . $this->baseDirectory . '/' . $filename : $filename;
 
         if ($this->baseDirectory !== $this->directory) {
             $directory = str_replace($this->baseDirectory, '', $this->directory);
@@ -634,7 +623,7 @@ class Azure extends AbstractAdapter
      */
     public function fetchFileInfo(string $filename): array
     {
-        $filename = (!str_starts_with($filename, '/')) ? '/' . $filename : $filename;
+        $filename = (!str_starts_with($filename, '/')) ? '/' . $this->baseDirectory . '/' . $filename : $filename;
 
         if ($this->baseDirectory !== $this->directory) {
             $directory = str_replace($this->baseDirectory, '', $this->directory);
@@ -683,25 +672,9 @@ class Azure extends AbstractAdapter
         if (str_ends_with($directory, '/')) {
             $directory = substr($directory, 0, -1);
         }
-
-        $directories  = explode('/', $directory);
-        $result       = false;
-        $curDirectory = $this->directory;
-        $dirString    = substr(str_replace($this->baseDirectory, '', $this->directory), 1) . '/';
-        foreach ($directories as $directory) {
-            $dirs       = $this->listDirs();
-            $dirString .= $directory . '/';
-            if (in_array($directory . '/', $dirs)) {
-                $result = true;
-            } else {
-                $result = false;
-            }
-            $this->chdir($dirString);
-        }
-
-        $this->directory = $curDirectory;
-
-        return $result;
+        $info = $this->fetchFileInfo($directory);
+        return (isset($info['headers']) && isset($info['headers']['x-ms-resource-type']) &&
+            $info['headers']['x-ms-resource-type'] == 'directory');
     }
 
     /**
@@ -712,7 +685,9 @@ class Azure extends AbstractAdapter
      */
     public function isFile(string $filename): bool
     {
-        return $this->fileExists($filename);
+        $info = $this->fetchFileInfo($filename);
+        return (isset($info['headers']) && isset($info['headers']['x-ms-resource-type']) &&
+            $info['headers']['x-ms-resource-type'] == 'file');
     }
 
     /**
