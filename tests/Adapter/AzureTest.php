@@ -13,27 +13,35 @@ class AzureTest extends TestCase
 
     protected $storage2 = null;
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function setUp(): void
     {
         $this->storage  = Storage::createAzure($_ENV['AZURE_NAME'], $_ENV['AZURE_KEY'], $_ENV['AZURE_CONTAINER']);
         $this->storage2 = Storage::createAzure($_ENV['AZURE_NAME'], $_ENV['AZURE_KEY'], $_ENV['AZURE_CONTAINER_ALT']);
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testConstructor()
     {
         $this->assertInstanceOf('Pop\Storage\Storage', $this->storage);
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testGetClient()
     {
         $this->assertTrue($this->storage->adapter()->hasClient());
         $this->assertInstanceOf('Pop\Http\Client', $this->storage->adapter()->getClient());
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testGetAuth()
     {
         $this->assertTrue($this->storage->adapter()->hasAuth());
@@ -44,27 +52,35 @@ class AzureTest extends TestCase
         $this->assertNotEmpty($this->storage->adapter()->getAuth()->getAccountKey());
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testMkDir()
     {
         $this->storage->mkdir('bad');
         $this->assertInstanceOf('Pop\Storage\Storage', $this->storage);
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testRmDir()
     {
         $this->storage->rmdir('bad');
         $this->assertInstanceOf('Pop\Storage\Storage', $this->storage);
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testFileExists()
     {
         $this->assertFalse($this->storage->fileExists('uploaded.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testPutFile()
     {
         file_put_contents(__DIR__ . '/../tmp/uploaded.txt', 'uploaded');
@@ -72,7 +88,9 @@ class AzureTest extends TestCase
         $this->assertTrue($this->storage->fileExists('uploaded.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testCopyFile()
     {
         $this->storage->copyFile('uploaded.txt', 'uploaded-copy.txt');
@@ -81,7 +99,9 @@ class AzureTest extends TestCase
         $this->assertFalse($this->storage->fileExists('uploaded-copy.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testCopyFileToExternal()
     {
         file_put_contents(__DIR__ . '/../tmp/foo.txt', 123);
@@ -96,7 +116,9 @@ class AzureTest extends TestCase
         unlink(__DIR__ . '/../tmp/foo.txt');
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testMoveFileToExternal()
     {
         file_put_contents(__DIR__ . '/../tmp/foo.txt', 123);
@@ -111,7 +133,9 @@ class AzureTest extends TestCase
         unlink(__DIR__ . '/../tmp/foo.txt');
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testCopyFileFromExternal()
     {
         file_put_contents(__DIR__ . '/../tmp/foo.txt', 123);
@@ -126,7 +150,9 @@ class AzureTest extends TestCase
         unlink(__DIR__ . '/../tmp/foo.txt');
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testMoveFileFromExternal()
     {
         file_put_contents(__DIR__ . '/../tmp/foo.txt', 123);
@@ -141,7 +167,9 @@ class AzureTest extends TestCase
         unlink(__DIR__ . '/../tmp/foo.txt');
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testRenameFile()
     {
         $this->storage->renameFile('uploaded.txt', 'uploaded-moved.txt');
@@ -152,7 +180,9 @@ class AzureTest extends TestCase
         $this->assertTrue($this->storage->fileExists('uploaded.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testReplaceFileContents()
     {
         $this->assertEquals('uploaded', $this->storage->fetchFile('uploaded.txt'));
@@ -162,20 +192,26 @@ class AzureTest extends TestCase
         $this->assertEquals('uploaded', $this->storage->fetchFile('uploaded.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testIsFile()
     {
         $this->assertTrue($this->storage->isFile('uploaded.txt'));
         $this->assertFalse($this->storage->isDir('uploaded.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testFetchFile()
     {
         $this->assertEquals('uploaded', $this->storage->fetchFile('uploaded.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testFileInfo()
     {
         $info = $this->storage->fetchFileInfo('uploaded.txt');
@@ -185,14 +221,18 @@ class AzureTest extends TestCase
         $this->assertFalse($this->storage->getFileMTime('uploaded.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testFileInfoNoFile()
     {
         $info = $this->storage->fetchFileInfo('bad.txt');
         $this->assertEquals(404, $info['code']);
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testPutFileContents()
     {
         $this->storage->putFileContents('uploaded-2.txt', 'uploaded2');
@@ -201,7 +241,9 @@ class AzureTest extends TestCase
         $this->assertFalse($this->storage->fileExists('uploaded-2.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testUploadFile()
     {
         file_put_contents(__DIR__ . '/uploaded-3.txt', 'uploaded');
@@ -217,7 +259,9 @@ class AzureTest extends TestCase
         $this->assertFalse($this->storage->fileExists('uploaded-3.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testUploadFileException()
     {
         $this->expectException('Pop\Storage\Adapter\Exception');
@@ -228,31 +272,41 @@ class AzureTest extends TestCase
         $this->storage->uploadFile($file);
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testMd5File()
     {
         $this->assertTrue(is_string($this->storage->md5File('uploaded.txt')));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testMd5FileNoFile()
     {
         $this->assertFalse($this->storage->md5File('bad.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testListFiles()
     {
         $this->assertTrue(is_array($this->storage->listFiles()));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testListFilesSearch()
     {
         $this->assertTrue(is_array($this->storage->listFiles('uploaded.txt')));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testDeleteFile()
     {
         $this->assertTrue($this->storage->fileExists('uploaded.txt'));
@@ -260,7 +314,9 @@ class AzureTest extends TestCase
         $this->assertFalse($this->storage->fileExists('uploaded.txt'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testIsDir()
     {
         $this->storage->putFileContents('foo/test.txt', 'Hello World');
@@ -269,20 +325,26 @@ class AzureTest extends TestCase
         $this->assertFalse($this->storage->isFile('foo'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testGetFileType()
     {
         $this->assertEquals('dir', $this->storage->getFileType('foo'));
         $this->assertFalse($this->storage->getFileType('bad'));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testListDirsSearch()
     {
         $this->assertTrue(is_array($this->storage->listDirs('*foo/')));
     }
 
-    #[Group('skip')]
+    /**
+     * @group skip
+     */
     public function testListDirs()
     {
         $this->assertTrue(is_array($this->storage->listDirs()));
