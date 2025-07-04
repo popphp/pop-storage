@@ -151,7 +151,6 @@ class Auth extends AbstractAuth
         return $result;
     }
 
-
     /**
      * Computes the authorization signature for blob and queue shared key.
      *

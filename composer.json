@@ -22,7 +22,7 @@
     "require": {
         "php": ">=8.2.0",
         "popphp/pop-dir": "^4.0.2",
-        "popphp/pop-http": "^5.3.2",
+        "popphp/pop-http": "^5.3.3",
         "popphp/pop-utils": "^2.2.0",
         "aws/aws-sdk-php": "^3.339.12"
     },
