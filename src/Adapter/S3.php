@@ -89,9 +89,17 @@ class S3 extends AbstractAdapter
      */
     public function mkdir(string $directory): void
     {
+        $directory = $this->scrub($directory) . '/';
+        $bucket    = str_replace('s3://', '', $this->directory);
+        if (str_contains($bucket, '/')) {
+            $subfolder = substr($bucket, (strpos($bucket, '/') + 1));
+            $directory = $subfolder . $directory;
+            $bucket    = substr($bucket, 0, strpos($bucket, '/'));
+        }
+
         $this->client->putObject([
-            'Bucket' => str_replace('s3://', '', $this->directory),
-            'Key'    => $this->scrub($directory) . '/',
+            'Bucket' => $bucket,
+            'Key'    => $directory,
             'Body'   => ''
         ]);
     }
