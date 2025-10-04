@@ -5,7 +5,6 @@ namespace Pop\Storage\Test\Adapter;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\Group;
 use Pop\Storage\Storage;
-use Pop\Storage\Adapter\Azure;
 
 class AzureTest extends TestCase
 {
