@@ -46,7 +46,7 @@ Install `pop-storage` using Composer.
 Or, require it in your composer.json file
 
     "require": {
-        "popphp/pop-storage" : "^2.1.0"
+        "popphp/pop-storage" : "^2.1.3"
     }
 
 [Top](#pop-storage)
