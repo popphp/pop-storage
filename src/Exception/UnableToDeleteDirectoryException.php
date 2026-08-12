@@ -11,10 +11,12 @@
 /**
  * @namespace
  */
-namespace Pop\Storage;
+namespace Pop\Storage\Exception;
+
+use Pop\Storage\Exception as StorageException;
 
 /**
- * Storage exception class
+ * Unable to delete directory exception class
  *
  * @category   Pop
  * @package    Pop\Storage
@@ -23,4 +25,5 @@ namespace Pop\Storage;
  * @license    https://www.popphp.org/license     New BSD License
  * @version    3.0.0
  */
-class Exception extends \Exception {}
+class UnableToDeleteDirectoryException extends StorageException
+{}

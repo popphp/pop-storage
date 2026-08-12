@@ -4,7 +4,7 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
  */
 
@@ -21,9 +21,9 @@ use Pop\Http\Client\Request;
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
- * @version    2.1.3
+ * @version    3.0.0
  */
 interface AuthInterface
 {
@@ -97,5 +97,18 @@ interface AuthInterface
      * @return Request
      */
     public function signRequest(Request $request): Request;
+
+    /**
+     * Generate a service SAS token for a blob
+     *
+     * @param  string     $resourcePath  e.g. '/container/blob.txt'
+     * @param  int        $expiresInSeconds
+     * @param  string     $permissions   e.g. 'r' for read-only
+     * @param  ?\DateTime $expiresAt     explicit expiry, overriding $expiresInSeconds (mainly for tests)
+     * @return string
+     */
+    public function generateSasToken(
+        string $resourcePath, int $expiresInSeconds, string $permissions = 'r', ?\DateTime $expiresAt = null
+    ): string;
 
 }

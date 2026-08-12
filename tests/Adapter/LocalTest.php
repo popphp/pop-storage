@@ -3,6 +3,8 @@
 namespace Pop\Storage\Test\Adapter;
 
 use PHPUnit\Framework\TestCase;
+use Pop\Storage\Exception\FileNotFoundException;
+use Pop\Storage\Exception\UnableToWriteFileException;
 use Pop\Storage\Storage;
 
 class LocalTest extends TestCase
@@ -124,13 +126,18 @@ class LocalTest extends TestCase
         $storage->uploadFile($file);
         $this->assertTrue($storage->fileExists('new-uploaded-file.txt'));
         $this->assertEquals('uploaded', $storage->fetchFile('new-uploaded-file.txt'));
-        $storage->deleteFile('uploaded.txt');
+        // 'uploaded.txt' was renamed to 'new-uploaded-file.txt' by uploadFile(), so it no longer
+        // exists under its original name.
+        try {
+            $storage->deleteFile('uploaded.txt');
+        } catch (FileNotFoundException) {
+        }
         $storage->deleteFile('new-uploaded-file.txt');
     }
 
     public function testUploadFileException()
     {
-        $this->expectException('Pop\Storage\Adapter\Exception');
+        $this->expectException(UnableToWriteFileException::class);
         $file = [
             'size'     => 8,
             'error'    => 0

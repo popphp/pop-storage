@@ -4,7 +4,7 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
  */
 
@@ -24,9 +24,9 @@ use Pop\Http\Client\Request;
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
- * @version    2.1.3
+ * @version    3.0.0
  */
 class Auth extends AbstractAuth
 {
@@ -86,6 +86,54 @@ class Auth extends AbstractAuth
         return 'SharedKey ' . $this->accountName . ':' . base64_encode(
             hash_hmac('sha256', $signature, base64_decode($this->accountKey), true)
         );
+    }
+
+    /**
+     * Generate a service SAS token for a blob
+     *
+     * @param  string     $resourcePath  e.g. '/container/blob.txt'
+     * @param  int        $expiresInSeconds
+     * @param  string     $permissions   e.g. 'r' for read-only
+     * @param  ?\DateTime $expiresAt     explicit expiry, overriding $expiresInSeconds (mainly for tests)
+     * @return string
+     */
+    public function generateSasToken(
+        string $resourcePath, int $expiresInSeconds, string $permissions = 'r', ?\DateTime $expiresAt = null
+    ): string
+    {
+        $expiry = $expiresAt ?? (new \DateTime('now', new \DateTimeZone('UTC')))->modify('+' . $expiresInSeconds . ' seconds');
+        $signedExpiry = $expiry->format('Y-m-d\TH:i:s\Z');
+        $canonicalizedResource = '/blob/' . $this->accountName . $resourcePath;
+
+        $stringToSign = implode("\n", [
+            $permissions,
+            '',
+            $signedExpiry,
+            $canonicalizedResource,
+            '',
+            '',
+            'https',
+            '2025-01-05',
+            'b',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+        ]);
+
+        $signature = base64_encode(hash_hmac('sha256', $stringToSign, base64_decode($this->accountKey), true));
+
+        return http_build_query([
+            'sv'  => '2025-01-05',
+            'sr'  => 'b',
+            'sp'  => $permissions,
+            'se'  => $signedExpiry,
+            'spr' => 'https',
+            'sig' => $signature,
+        ]);
     }
 
     /**
@@ -223,35 +271,6 @@ class Auth extends AbstractAuth
         }
 
         return $canonicalizedHeaders;
-    }
-
-    /**
-     * Computes canonicalized resources from URL using Table formar
-     *
-     * @param  string $url
-     * @param  array  $queryParams
-     * @return string
-     */
-    protected function computeCanonicalizedResourceForTable(string $url, array $queryParams): string
-    {
-        $queryParams = array_change_key_case($queryParams);
-
-        // 1. Beginning with an empty string (""), append a forward slash (/),
-        //    followed by the name of the account that owns the accessed resource.
-        $canonicalizedResource = '/' . $this->accountName;
-
-        // 2. Append the resource's encoded URI path, without any query parameters.
-        $canonicalizedResource .= parse_url($url, PHP_URL_PATH);
-
-        // 3. The query string should include the question mark and the comp
-        //    parameter (for example, ?comp=metadata). No other parameters should
-        //    be included on the query string.
-        if (array_key_exists('comp', $queryParams)) {
-            $canonicalizedResource .= '?comp=';
-            $canonicalizedResource .= $queryParams['comp'];
-        }
-
-        return $canonicalizedResource;
     }
 
     /**

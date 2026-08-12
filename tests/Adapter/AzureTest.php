@@ -4,6 +4,8 @@ namespace Pop\Storage\Test\Adapter;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\Group;
+use Pop\Storage\Exception\FileNotFoundException;
+use Pop\Storage\Exception\UnableToWriteFileException;
 use Pop\Storage\Storage;
 
 class AzureTest extends TestCase
@@ -182,7 +184,9 @@ class AzureTest extends TestCase
         $this->assertTrue(is_array($info));
         $this->assertEquals('file', $this->storage->getFileType('uploaded.txt'));
         $this->assertNotEmpty($this->storage->getFileSize('uploaded.txt'));
-        $this->assertFalse($this->storage->getFileMTime('uploaded.txt'));
+        // getFileMTime() no longer falls back to a sentinel - a HEAD on an existing blob
+        // returns Last-Modified (or x-ms-creation-time), and throws if neither is present.
+        $this->assertNotEmpty($this->storage->getFileMTime('uploaded.txt'));
     }
 
     #[Group('skip')]
@@ -220,7 +224,7 @@ class AzureTest extends TestCase
     #[Group('skip')]
     public function testUploadFileException()
     {
-        $this->expectException('Pop\Storage\Adapter\Exception');
+        $this->expectException(UnableToWriteFileException::class);
         $file = [
             'size'     => 8,
             'error'    => 0
@@ -237,7 +241,8 @@ class AzureTest extends TestCase
     #[Group('skip')]
     public function testMd5FileNoFile()
     {
-        $this->assertFalse($this->storage->md5File('bad.txt'));
+        $this->expectException(FileNotFoundException::class);
+        $this->storage->md5File('bad.txt');
     }
 
     #[Group('skip')]
@@ -273,7 +278,9 @@ class AzureTest extends TestCase
     public function testGetFileType()
     {
         $this->assertEquals('dir', $this->storage->getFileType('foo'));
-        $this->assertFalse($this->storage->getFileType('bad'));
+
+        $this->expectException(FileNotFoundException::class);
+        $this->storage->getFileType('bad');
     }
 
     #[Group('skip')]

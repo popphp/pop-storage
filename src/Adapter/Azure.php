@@ -4,7 +4,7 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
  */
 
@@ -14,8 +14,17 @@
 namespace Pop\Storage\Adapter;
 
 use Pop\Storage\Adapter\Azure\Auth;
+use Pop\Http\Body;
 use Pop\Http\Client;
+use Pop\Http\Client\Handler\HandlerInterface;
 use Pop\Http\Client\Request;
+use Pop\Storage\Exception\FileNotFoundException;
+use Pop\Storage\Exception\PathTraversalException;
+use Pop\Storage\Exception\UnableToCopyFileException;
+use Pop\Storage\Exception\UnableToDeleteFileException;
+use Pop\Storage\Exception\UnableToMoveFileException;
+use Pop\Storage\Exception\UnableToReadFileException;
+use Pop\Storage\Exception\UnableToWriteFileException;
 use Pop\Utils\File;
 
 /**
@@ -24,12 +33,30 @@ use Pop\Utils\File;
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
- * @version    2.1.3
+ * @version    3.0.0
  */
 class Azure extends AbstractAdapter
 {
+
+    /**
+     * Maximum number of pages walkBlobs() will follow via NextMarker before giving up.
+     * A generous-but-finite backstop against a malformed or repeating continuation marker
+     * causing an infinite loop. Overridable in subclasses (e.g. for fast tests).
+     * @var int
+     */
+    protected const int MAX_LIST_PAGES = 10000;
+
+    /**
+     * Fallback Content-Type sent when the file/blob name has no extension File::getFileMimeType()
+     * can resolve (it returns null in that case) - required because the mime type feeds directly
+     * into a signed request header, and a null header value breaks request signing with a raw
+     * TypeError rather than a clean exception. 'application/octet-stream' is the standard
+     * "unknown binary content" MIME type.
+     * @var string
+     */
+    protected const string DEFAULT_CONTENT_TYPE = 'application/octet-stream';
 
     /**
      * HTTP client
@@ -42,6 +69,12 @@ class Azure extends AbstractAdapter
      * @var ?Auth
      */
     protected ?Auth $auth = null;
+
+    /**
+     * HTTP client handler, injected for testing (defaults to the real Curl handler when null)
+     * @var ?HandlerInterface
+     */
+    protected ?HandlerInterface $handler = null;
 
     /**
      * Constructor
@@ -82,7 +115,7 @@ class Azure extends AbstractAdapter
         $request->addHeader('Date', gmdate('D, d M Y H:i:s T'))
             ->addHeader('Host', $this->auth->getAccountName() . '.blob.core.windows.net')
             ->addHeader('Content-Type', Client\Request::URLENCODED)
-            ->addHeader('User-Agent', 'pop-storage/2.1.3 (PHP ' . PHP_VERSION . ')/' . PHP_OS)
+            ->addHeader('User-Agent', 'pop-storage/3.0.0 (PHP ' . PHP_VERSION . ')/' . PHP_OS)
             ->addHeader('x-ms-client-request-id', uniqid())
             ->addHeader('x-ms-version', '2025-01-05');
 
@@ -98,6 +131,10 @@ class Azure extends AbstractAdapter
                 'auto'     => $auto
             ]
         ));
+
+        if ($this->handler !== null) {
+            $this->client->setHandler($this->handler);
+        }
 
         return $this;
     }
@@ -167,6 +204,79 @@ class Azure extends AbstractAdapter
     }
 
     /**
+     * Set handler
+     *
+     * @param  HandlerInterface $handler
+     * @return Azure
+     */
+    public function setHandler(HandlerInterface $handler): Azure
+    {
+        $this->handler = $handler;
+        return $this;
+    }
+
+    /**
+     * Get handler
+     *
+     * @return ?HandlerInterface
+     */
+    public function getHandler(): ?HandlerInterface
+    {
+        return $this->handler;
+    }
+
+    /**
+     * Has handler
+     *
+     * @return bool
+     */
+    public function hasHandler(): bool
+    {
+        return ($this->handler !== null);
+    }
+
+    /**
+     * Get the current directory as a blob-name prefix relative to the base directory
+     * (the container), i.e. what chdir() has descended into. Returns an empty string when
+     * the current directory is the base directory itself.
+     *
+     * @return string
+     */
+    private function currentPrefix(): string
+    {
+        if ($this->baseDirectory === $this->directory) {
+            return '';
+        }
+
+        $directory = substr($this->directory, strlen($this->baseDirectory));
+
+        return trim(str_replace('\\', '/', $directory), '/');
+    }
+
+    /**
+     * Resolve a filename/directory argument to its full Azure blob URI, accounting for
+     * the current directory (chdir()) relative to the base directory
+     *
+     * The path is scrubbed first, so a caller-supplied filename can neither traverse out of
+     * the storage directory via '..' nor escape the container entirely by looking like an
+     * absolute path. This is only for internal, current-directory-scoped paths - the
+     * *External() methods set their genuinely external URI on the request directly.
+     *
+     * @param  string $path
+     * @throws PathTraversalException
+     * @return string
+     */
+    private function resolveUri(string $path): string
+    {
+        $path   = $this->scrub($path);
+        $prefix = $this->currentPrefix();
+
+        // The blob URI is always /{container}/{current directory}/{path} - the container comes
+        // first, so anything chdir() descended into belongs between it and the path.
+        return '/' . $this->baseDirectory . (($prefix !== '') ? '/' . $prefix : '') . '/' . $path;
+    }
+
+    /**
      * Make directory
      *
      * @param  string $directory
@@ -198,43 +308,12 @@ class Azure extends AbstractAdapter
      * List directories
      *
      * @param  ?string $search
+     * @param  bool    $recursive
      * @return array
      */
-    public function listDirs(?string $search = null): array
+    public function listDirs(?string $search = null, bool $recursive = false): array
     {
-        $dirs = [];
-
-        $uri = '/' . $this->baseDirectory;
-
-        $params = ['restype' => 'container', 'comp' => 'list'];
-
-        if ($this->baseDirectory !== $this->directory) {
-            $directory = str_replace($this->baseDirectory, '', $this->directory);
-            if (str_ends_with($directory, '/')) {
-                $directory = substr($directory, 0, -1);
-            }
-            $params['prefix'] = $directory;
-        }
-
-        $this->initClient();
-        $this->client->getRequest()->setQuery($params);
-        $this->client->getRequest()->setUri($uri);
-        $this->auth->signRequest($this->client->getRequest());
-
-        $response = $this->client->send();
-
-        if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
-            $blobs = (!isset($response['Blobs']['Blob'][0])) ? [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
-            foreach ($blobs as $blob) {
-                if (isset($blob['Properties']) && isset($blob['Properties']['ResourceType']) &&
-                    ($blob['Properties']['ResourceType'] == 'directory')) {
-                    if ((!isset($params['prefix']) && !str_contains($blob['Name'], '/')) ||
-                        (isset($params['prefix']) && str_contains($blob['Name'], '/'))) {
-                        $dirs[] = $blob['Name'];
-                    }
-                }
-            }
-        }
+        $dirs = $this->walkBlobs($recursive, 'directory');
 
         if ($search !== null) {
             $dirs = $this->searchFilter($dirs, $search);
@@ -247,43 +326,12 @@ class Azure extends AbstractAdapter
      * List files
      *
      * @param  ?string $search
+     * @param  bool    $recursive
      * @return array
      */
-    public function listFiles(?string $search = null): array
+    public function listFiles(?string $search = null, bool $recursive = false): array
     {
-        $files = [];
-
-        $uri = '/' . $this->baseDirectory;
-
-        $params = ['restype' => 'container', 'comp' => 'list'];
-
-        if ($this->baseDirectory !== $this->directory) {
-            $directory = str_replace($this->baseDirectory, '', $this->directory);
-            if (str_ends_with($directory, '/')) {
-                $directory = substr($directory, 0, -1);
-            }
-            $params['prefix'] = $directory;
-        }
-
-        $this->initClient();
-        $this->client->getRequest()->setQuery($params);
-        $this->client->getRequest()->setUri($uri);
-        $this->auth->signRequest($this->client->getRequest());
-
-        $response = $this->client->send();
-
-        if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
-            $blobs = (!isset($response['Blobs']['Blob'][0])) ? [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
-            foreach ($blobs as $blob) {
-                if (isset($blob['Properties']) && isset($blob['Properties']['ResourceType']) &&
-                    ($blob['Properties']['ResourceType'] == 'file')) {
-                    if ((!isset($params['prefix']) && !str_contains($blob['Name'], '/')) ||
-                        (isset($params['prefix']) && str_contains($blob['Name'], '/'))) {
-                        $files[] = $blob['Name'];
-                    }
-                }
-            }
-        }
+        $files = $this->walkBlobs($recursive, 'file');
 
         if ($search !== null) {
             $files = $this->searchFilter($files, $search);
@@ -293,36 +341,100 @@ class Azure extends AbstractAdapter
     }
 
     /**
+     * Walk every page of the blob listing for the current directory, returning blob
+     * names matching $resourceType ('file' or 'directory')
+     *
+     * @param  bool   $recursive
+     * @param  string $resourceType
+     * @return array
+     */
+    private function walkBlobs(bool $recursive, string $resourceType): array
+    {
+        $results = [];
+        $uri     = '/' . $this->baseDirectory;
+        $params  = ['restype' => 'container', 'comp' => 'list'];
+        $prefix  = $this->currentPrefix();
+
+        if (!$recursive) {
+            $params['delimiter'] = '/';
+        }
+        if ($prefix !== '') {
+            $prefix          .= '/';
+            $params['prefix'] = $prefix;
+        }
+
+        $pageCount = 0;
+
+        do {
+            if (++$pageCount > static::MAX_LIST_PAGES) {
+                throw new UnableToReadFileException(
+                    'Error: Exceeded maximum page count while listing blobs - the continuation marker may be malformed.'
+                );
+            }
+
+            $this->initClient();
+            $this->client->getRequest()->setQuery($params);
+            $this->client->getRequest()->setUri($uri);
+            $this->auth->signRequest($this->client->getRequest());
+            $response = $this->client->send();
+
+            if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
+                $blobs = (!isset($response['Blobs']['Blob'][0])) ? [$response['Blobs']['Blob']] : $response['Blobs']['Blob'];
+                foreach ($blobs as $blob) {
+                    if (isset($blob['Properties']) && isset($blob['Properties']['ResourceType']) &&
+                        ($blob['Properties']['ResourceType'] == $resourceType)) {
+                        // Azure names blobs relative to the container root; results have to be
+                        // relative to the current directory so they round-trip straight back into
+                        // fetchFile()/deleteFile(), the same as the Local and S3 adapters.
+                        $name = ($prefix !== '' && str_starts_with($blob['Name'], $prefix)) ?
+                            substr($blob['Name'], strlen($prefix)) : $blob['Name'];
+
+                        if (($name !== '') && ($recursive || !str_contains(rtrim($name, '/'), '/'))) {
+                            $results[] = $name;
+                        }
+                    }
+                }
+            }
+
+            $nextMarker = (is_array($response) && !empty($response['NextMarker'])) ? $response['NextMarker'] : null;
+            if ($nextMarker !== null) {
+                $params['marker'] = $nextMarker;
+            }
+        } while ($nextMarker !== null);
+
+        return $results;
+    }
+
+    /**
      * Put file
      *
      * @param  string $fileFrom
      * @param  bool $copy
-     * @throws Exception|Client\Handler\Exception|\Pop\Http\Exception|\Pop\Utils\Exception
+     * @throws FileNotFoundException|UnableToWriteFileException
      * @return void
      */
     public function putFile(string $fileFrom, bool $copy = true): void
     {
-        if (file_exists($fileFrom)) {
-            $uri = '/' . $this->baseDirectory . '/' . basename($fileFrom);
-            if ($this->baseDirectory !== $this->directory) {
-                $directory = str_replace($this->baseDirectory, '', $this->directory);
-                if (str_ends_with($directory, '/')) {
-                    $directory = substr($directory, 0, -1);
-                }
-                $uri = $directory . $uri;
-            }
+        if (!file_exists($fileFrom)) {
+            throw new FileNotFoundException('Error: The file \'' . $fileFrom . '\' was not found.');
+        }
 
-            $fileContents = file_get_contents($fileFrom);
+        $uri = $this->resolveUri(basename($fileFrom));
 
-            $this->initClient('PUT', [
-                'content-length'         => strlen($fileContents),
-                'x-ms-blob-type'         => 'BlockBlob',
-                'x-ms-blob-content-type' => File::getFileMimeType($fileFrom)
-            ]);
-            $this->client->getRequest()->setUri($uri);
-            $this->client->getRequest()->setBody($fileContents);
-            $this->auth->signRequest($this->client->getRequest());
-            $this->client->send();
+        $fileContents = file_get_contents($fileFrom);
+
+        $this->initClient('PUT', [
+            'content-length'         => strlen($fileContents),
+            'x-ms-blob-type'         => 'BlockBlob',
+            'x-ms-blob-content-type' => File::getFileMimeType($fileFrom) ?? self::DEFAULT_CONTENT_TYPE
+        ], false);
+        $this->client->getRequest()->setUri($uri);
+        $this->client->getRequest()->setBody($fileContents);
+        $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
+
+        if (!$response->isSuccess()) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $fileFrom . '\' (HTTP ' . $response->getCode() . ').');
         }
     }
 
@@ -335,59 +447,90 @@ class Azure extends AbstractAdapter
      */
     public function putFileContents(string $filename, string $fileContents): void
     {
-        $uri = '/' . $this->baseDirectory . '/' . $filename;
-        if ($this->baseDirectory !== $this->directory) {
-            $directory = str_replace($this->baseDirectory, '', $this->directory);
-            if (str_ends_with($directory, '/')) {
-                $directory = substr($directory, 0, -1);
-            }
-            $uri = $directory . $uri;
-        }
+        $uri = $this->resolveUri($filename);
 
         $this->initClient('PUT', [
             'content-length'         => strlen($fileContents),
             'x-ms-blob-type'         => 'BlockBlob',
-            'x-ms-blob-content-type' => File::getFileMimeType($filename)
-        ]);
+            'x-ms-blob-content-type' => File::getFileMimeType($filename) ?? self::DEFAULT_CONTENT_TYPE
+        ], false);
         $this->client->getRequest()->setUri($uri);
         $this->client->getRequest()->setBody($fileContents);
         $this->auth->signRequest($this->client->getRequest());
-        $this->client->send();
+        $response = $this->client->send();
+
+        if (!$response->isSuccess()) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $filename . '\' (HTTP ' . $response->getCode() . ').');
+        }
+    }
+
+    /**
+     * Put file from a stream resource
+     *
+     * @param  string $filename
+     * @param  mixed  $resource
+     * @throws UnableToWriteFileException
+     * @return void
+     */
+    public function putFileStream(string $filename, mixed $resource): void
+    {
+        if (!is_resource($resource)) {
+            throw new UnableToWriteFileException('Error: The provided resource is not a valid stream.');
+        }
+
+        $uri  = $this->resolveUri($filename);
+        $stat = fstat($resource);
+
+        $body = new Body();
+        $body->setContentFromStream($resource);
+
+        $this->initClient('PUT', [
+            'content-length'         => $stat['size'],
+            'x-ms-blob-type'         => 'BlockBlob',
+            'x-ms-blob-content-type' => File::getFileMimeType($filename) ?? self::DEFAULT_CONTENT_TYPE
+        ], false);
+        $this->client->getRequest()->setUri($uri);
+        $this->client->getRequest()->setBody($body);
+        $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
+
+        if (!$response->isSuccess()) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $filename . '\' (HTTP ' . $response->getCode() . ').');
+        }
     }
 
     /**
      * Upload file from server request $_FILES['file']
      *
      * @param  array $file
-     * @throws Exception
+     * @throws UnableToWriteFileException|PathTraversalException
      * @return void
      */
     public function uploadFile(array $file): void
     {
         if (!isset($file['tmp_name']) || !isset($file['name'])) {
-            throw new Exception('Error: The uploaded file array was not valid');
+            throw new UnableToWriteFileException('Error: The uploaded file array was not valid.');
         }
-        if (file_exists($file['tmp_name'])) {
-            $uri = '/' . $this->baseDirectory . '/' . $file['name'];
-            if ($this->baseDirectory !== $this->directory) {
-                $directory = str_replace($this->baseDirectory, '', $this->directory);
-                if (str_ends_with($directory, '/')) {
-                    $directory = substr($directory, 0, -1);
-                }
-                $uri = $directory . $uri;
-            }
+        if (!file_exists($file['tmp_name'])) {
+            throw new UnableToWriteFileException('Error: The uploaded file array was not valid.');
+        }
 
-            $fileContents = file_get_contents($file['tmp_name']);
+        $uri = $this->resolveUri($file['name']);
 
-            $this->initClient('PUT', [
-                'content-length'         => strlen($fileContents),
-                'x-ms-blob-type'         => 'BlockBlob',
-                'x-ms-blob-content-type' => File::getFileMimeType($file['name'])
-            ]);
-            $this->client->getRequest()->setUri($uri);
-            $this->client->getRequest()->setBody($fileContents);
-            $this->auth->signRequest($this->client->getRequest());
-            $this->client->send();
+        $fileContents = file_get_contents($file['tmp_name']);
+
+        $this->initClient('PUT', [
+            'content-length'         => strlen($fileContents),
+            'x-ms-blob-type'         => 'BlockBlob',
+            'x-ms-blob-content-type' => File::getFileMimeType($file['name']) ?? self::DEFAULT_CONTENT_TYPE
+        ], false);
+        $this->client->getRequest()->setUri($uri);
+        $this->client->getRequest()->setBody($fileContents);
+        $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
+
+        if (!$response->isSuccess()) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $file['name'] . '\' (HTTP ' . $response->getCode() . ').');
         }
     }
 
@@ -402,27 +545,23 @@ class Azure extends AbstractAdapter
     {
         $sourceFileInfo = $this->fetchFileInfo($sourceFile);
 
-        if (is_array($sourceFileInfo) && isset($sourceFileInfo['headers']) &&
-            isset($sourceFileInfo['headers']['Content-Type']) && (!$sourceFileInfo['isError'])) {
-            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $this->baseDirectory . '/' . $sourceFile : $sourceFile;
-            $destUri   = (!str_starts_with($destFile, '/')) ? '/' . $this->baseDirectory . '/' . $destFile : $destFile;
+        if ($sourceFileInfo['code'] === 404) {
+            throw new FileNotFoundException('Error: The file \'' . $sourceFile . '\' was not found.');
+        }
 
-            if ($this->baseDirectory !== $this->directory) {
-                $directory = str_replace($this->baseDirectory, '', $this->directory);
-                if (str_ends_with($directory, '/')) {
-                    $directory = substr($directory, 0, -1);
-                }
-                $sourceUri = $directory . $sourceUri;
-                $destUri   = $directory . $destUri;
-            }
+        $sourceUri = $this->resolveUri($sourceFile);
+        $destUri   = $this->resolveUri($destFile);
 
-            $this->initClient('PUT', [
-                'content-length'   => $sourceFileInfo['headers']['Content-Length'],
-                'x-ms-copy-source' => $this->auth->getBaseUri() . $sourceUri,
-            ]);
-            $this->client->getRequest()->setUri($destUri);
-            $this->auth->signRequest($this->client->getRequest());
-            $this->client->send();
+        $this->initClient('PUT', [
+            'content-length'   => $sourceFileInfo['headers']['Content-Length'],
+            'x-ms-copy-source' => $this->auth->getBaseUri() . $sourceUri,
+        ], false);
+        $this->client->getRequest()->setUri($destUri);
+        $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
+
+        if (!$response->isSuccess()) {
+            throw new UnableToCopyFileException('Error: Unable to copy file \'' . $sourceFile . '\' (HTTP ' . $response->getCode() . ').');
         }
     }
 
@@ -437,25 +576,22 @@ class Azure extends AbstractAdapter
     {
         $sourceFileInfo = $this->fetchFileInfo($sourceFile);
 
-        if (is_array($sourceFileInfo) && isset($sourceFileInfo['headers']) &&
-            isset($sourceFileInfo['headers']['Content-Type']) && (!$sourceFileInfo['isError'])) {
-            $sourceUri = (!str_starts_with($sourceFile, '/')) ? '/' . $this->baseDirectory . '/' . $sourceFile : $sourceFile;
+        if ($sourceFileInfo['code'] === 404) {
+            throw new FileNotFoundException('Error: The file \'' . $sourceFile . '\' was not found.');
+        }
 
-            if ($this->baseDirectory !== $this->directory) {
-                $directory = str_replace($this->baseDirectory, '', $this->directory);
-                if (str_ends_with($directory, '/')) {
-                    $directory = substr($directory, 0, -1);
-                }
-                $sourceUri = $directory . $sourceUri;
-            }
+        $sourceUri = $this->resolveUri($sourceFile);
 
-            $this->initClient('PUT', [
-                'content-length'   => $sourceFileInfo['headers']['Content-Length'],
-                'x-ms-copy-source' => $this->auth->getBaseUri() . $sourceUri,
-            ]);
-            $this->client->getRequest()->setUri($externalFile);
-            $this->auth->signRequest($this->client->getRequest());
-            $this->client->send();
+        $this->initClient('PUT', [
+            'content-length'   => $sourceFileInfo['headers']['Content-Length'],
+            'x-ms-copy-source' => $this->auth->getBaseUri() . $sourceUri,
+        ], false);
+        $this->client->getRequest()->setUri($externalFile);
+        $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
+
+        if (!$response->isSuccess()) {
+            throw new UnableToCopyFileException('Error: Unable to copy file \'' . $sourceFile . '\' (HTTP ' . $response->getCode() . ').');
         }
     }
 
@@ -473,24 +609,25 @@ class Azure extends AbstractAdapter
         $this->auth->signRequest($this->client->getRequest());
         $response = $this->client->send();
 
-        if (($response->isSuccess()) && ($response->hasHeader('Content-Length'))) {
-            $destUri = (!str_starts_with($destFile, '/')) ? '/' . $this->baseDirectory . '/' . $destFile : $destFile;
+        if ($response->getCode() === 404) {
+            throw new FileNotFoundException('Error: The file \'' . $externalFile . '\' was not found.');
+        }
+        if (!$response->isSuccess()) {
+            throw new UnableToCopyFileException('Error: Unable to copy file \'' . $externalFile . '\' (HTTP ' . $response->getCode() . ').');
+        }
 
-            if ($this->baseDirectory !== $this->directory) {
-                $directory = str_replace($this->baseDirectory, '', $this->directory);
-                if (str_ends_with($directory, '/')) {
-                    $directory = substr($directory, 0, -1);
-                }
-                $destUri   = $directory . $destUri;
-            }
+        $destUri = $this->resolveUri($destFile);
 
-            $this->initClient('PUT', [
-                'content-length'   => $response->getHeader('Content-Length')->getValueAsString(),
-                'x-ms-copy-source' => $this->auth->getBaseUri() . $externalFile,
-            ]);
-            $this->client->getRequest()->setUri($destUri);
-            $this->auth->signRequest($this->client->getRequest());
-            $this->client->send();
+        $this->initClient('PUT', [
+            'content-length'   => $response->getHeaderValueAsString('Content-Length'),
+            'x-ms-copy-source' => $this->auth->getBaseUri() . $externalFile,
+        ], false);
+        $this->client->getRequest()->setUri($destUri);
+        $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
+
+        if (!$response->isSuccess()) {
+            throw new UnableToCopyFileException('Error: Unable to copy file \'' . $externalFile . '\' (HTTP ' . $response->getCode() . ').');
         }
     }
 
@@ -504,7 +641,13 @@ class Azure extends AbstractAdapter
     public function moveFileToExternal(string $sourceFile, string $externalFile): void
     {
         $this->copyFileToExternal($sourceFile, $externalFile);
-        $this->deleteFile($sourceFile);
+        try {
+            $this->deleteFile($sourceFile);
+        } catch (UnableToDeleteFileException $exception) {
+            throw new UnableToMoveFileException(
+                'Error: Copied \'' . $sourceFile . '\' to \'' . $externalFile . '\' but failed to remove the source.', 0, $exception
+            );
+        }
     }
 
     /**
@@ -524,10 +667,19 @@ class Azure extends AbstractAdapter
             $headers['x-ms-delete-snapshots'] = ($snapshots == 'only') ? 'only' : 'include';
         }
 
-        $this->initClient('DELETE', $headers);
+        $this->initClient('DELETE', $headers, false);
         $this->client->getRequest()->setUri($externalFile);
         $this->auth->signRequest($this->client->getRequest());
-        $this->client->send();
+        $response = $this->client->send();
+
+        if ($response->getCode() === 404) {
+            throw new FileNotFoundException('Error: The file \'' . $externalFile . '\' was not found.');
+        }
+        if (!$response->isSuccess()) {
+            throw new UnableToMoveFileException(
+                'Error: Copied \'' . $externalFile . '\' to \'' . $destFile . '\' but failed to remove the source (HTTP ' . $response->getCode() . ').'
+            );
+        }
     }
 
     /**
@@ -540,7 +692,13 @@ class Azure extends AbstractAdapter
     public function renameFile(string $oldFile, string $newFile): void
     {
         $this->copyFile($oldFile, $newFile);
-        $this->deleteFile($oldFile);
+        try {
+            $this->deleteFile($oldFile);
+        } catch (UnableToDeleteFileException $exception) {
+            throw new UnableToMoveFileException(
+                'Error: Copied \'' . $oldFile . '\' to \'' . $newFile . '\' but failed to remove the source.', 0, $exception
+            );
+        }
     }
 
     /**
@@ -548,10 +706,14 @@ class Azure extends AbstractAdapter
      *
      * @param  string $filename
      * @param  string $fileContents
+     * @throws FileNotFoundException
      * @return void
      */
     public function replaceFileContents(string $filename, string $fileContents): void
     {
+        if (!$this->fileExists($filename)) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
         $this->putFileContents($filename, $fileContents);
     }
 
@@ -564,24 +726,24 @@ class Azure extends AbstractAdapter
      */
     public function deleteFile(string $filename, ?string $snapshots = 'include'): void
     {
-        $uri = '/' . $this->baseDirectory . '/' . $filename;
-        if ($this->baseDirectory !== $this->directory) {
-            $directory = str_replace($this->baseDirectory, '', $this->directory);
-            if (str_ends_with($directory, '/')) {
-                $directory = substr($directory, 0, -1);
-            }
-            $uri = $directory . $uri;
-        }
+        $uri = $this->resolveUri($filename);
 
         $headers = [];
         if ($snapshots !== null) {
             $headers['x-ms-delete-snapshots'] = ($snapshots == 'only') ? 'only' : 'include';
         }
 
-        $this->initClient('DELETE', $headers);
+        $this->initClient('DELETE', $headers, false);
         $this->client->getRequest()->setUri($uri);
         $this->auth->signRequest($this->client->getRequest());
-        $this->client->send();
+        $response = $this->client->send();
+
+        if ($response->getCode() === 404) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
+        if (!$response->isSuccess()) {
+            throw new UnableToDeleteFileException('Error: Unable to delete file \'' . $filename . '\' (HTTP ' . $response->getCode() . ').');
+        }
     }
 
     /**
@@ -593,26 +755,59 @@ class Azure extends AbstractAdapter
      */
     public function fetchFile(string $filename, bool $raw = true): mixed
     {
-        $filename = (!str_starts_with($filename, '/')) ? '/' . $this->baseDirectory . '/' . $filename : $filename;
-
-        if ($this->baseDirectory !== $this->directory) {
-            $directory = str_replace($this->baseDirectory, '', $this->directory);
-            if (str_ends_with($directory, '/')) {
-                $directory = substr($directory, 0, -1);
-            }
-            $filename = $directory . $filename;
-        }
+        $uri = $this->resolveUri($filename);
 
         $this->initClient('GET', [], false);
-        $this->client->getRequest()->setUri($filename);
+        $this->client->getRequest()->setUri($uri);
         $this->auth->signRequest($this->client->getRequest());
         $response = $this->client->send();
 
-        if ($response->isSuccess()) {
-            return ($raw) ? $response->getBody()->getContent(): $response;
-        } else {
-            return null;
+        if ($response->getCode() === 404) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
         }
+        if (!$response->isSuccess()) {
+            throw new UnableToReadFileException('Error: Unable to read file \'' . $filename . '\' (HTTP ' . $response->getCode() . ').');
+        }
+
+        return ($raw) ? $response->getBody()->getContent() : $response;
+    }
+
+    /**
+     * Fetch file as a stream resource
+     *
+     * @param  string $filename
+     * @throws FileNotFoundException|UnableToReadFileException
+     * @return mixed
+     */
+    public function fetchFileStream(string $filename): mixed
+    {
+        $uri = $this->resolveUri($filename);
+
+        $this->initClient('GET', [], false);
+        $this->client->getRequest()->setUri($uri);
+        $this->auth->signRequest($this->client->getRequest());
+        $response = $this->client->send();
+
+        if ($response->getCode() === 404) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
+        if (!$response->isSuccess()) {
+            throw new UnableToReadFileException('Error: Unable to read file \'' . $filename . '\' (HTTP ' . $response->getCode() . ').');
+        }
+
+        $stream = $response->getBody()->getStream();
+        if (is_resource($stream)) {
+            rewind($stream);
+            return $stream;
+        }
+
+        // Body wasn't backed by a real stream (e.g. Mock handler content) - fall back to
+        // a fresh in-memory stream over the buffered content so the return contract
+        // (always a resource) holds regardless of what produced the response body.
+        $memory = fopen('php://memory', 'r+');
+        fwrite($memory, $response->getBody()->getContent());
+        rewind($memory);
+        return $memory;
     }
 
     /**
@@ -623,18 +818,10 @@ class Azure extends AbstractAdapter
      */
     public function fetchFileInfo(string $filename): array
     {
-        $filename = (!str_starts_with($filename, '/')) ? '/' . $this->baseDirectory . '/' . $filename : $filename;
-
-        if ($this->baseDirectory !== $this->directory) {
-            $directory = str_replace($this->baseDirectory, '', $this->directory);
-            if (str_ends_with($directory, '/')) {
-                $directory = substr($directory, 0, -1);
-            }
-            $filename = $directory . $filename;
-        }
+        $uri = $this->resolveUri($filename);
 
         $this->initClient('HEAD', [], false);
-        $this->client->getRequest()->setUri($filename);
+        $this->client->getRequest()->setUri($uri);
         $this->auth->signRequest($this->client->getRequest());
         $response = $this->client->send();
 
@@ -644,6 +831,21 @@ class Azure extends AbstractAdapter
             'headers' => $response->getHeadersAsArray(),
             'isError' => $response->isError()
         ];
+    }
+
+    /**
+     * Get a temporary (presigned) URL for the file, valid for $expiresInSeconds
+     *
+     * @param  string $filename
+     * @param  int    $expiresInSeconds
+     * @return string
+     */
+    public function getTemporaryUrl(string $filename, int $expiresInSeconds = 900): string
+    {
+        $uri   = $this->resolveUri($filename);
+        $token = $this->auth->generateSasToken($uri, $expiresInSeconds, 'r');
+
+        return $this->auth->getBaseUri() . $uri . '?' . $token;
     }
 
     /**
@@ -694,28 +896,44 @@ class Azure extends AbstractAdapter
      * Get file size
      *
      * @param  string $filename
-     * @return int|bool
+     * @throws FileNotFoundException|UnableToReadFileException
+     * @return int
      */
-    public function getFileSize(string $filename): int|bool
+    public function getFileSize(string $filename): int
     {
         $info = $this->fetchFileInfo($filename);
-        return $info['headers']['Content-Length'] ?? false;
+        if ($info['code'] == 404) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
+        if (!isset($info['headers']['Content-Length'])) {
+            throw new UnableToReadFileException(
+                'Error: No content length returned for \'' . $filename . '\'.'
+            );
+        }
+        return (int)$info['headers']['Content-Length'];
     }
 
     /**
      * Get file type
      *
      * @param  string $filename
-     * @return string|bool
+     * @throws FileNotFoundException|UnableToReadFileException
+     * @return string
      */
-    public function getFileType(string $filename): string|bool
+    public function getFileType(string $filename): string
     {
-        if ($this->isFile($filename)) {
+        $info = $this->fetchFileInfo($filename);
+        if ($info['code'] == 404) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
+        if (isset($info['headers']['x-ms-resource-type']) && ($info['headers']['x-ms-resource-type'] == 'file')) {
             return 'file';
-        } else if ($this->isDir($filename)) {
+        } else if (isset($info['headers']['x-ms-resource-type']) && ($info['headers']['x-ms-resource-type'] == 'directory')) {
             return 'dir';
         } else {
-            return false;
+            throw new UnableToReadFileException(
+                'Error: No resource type returned for \'' . $filename . '\'.'
+            );
         }
     }
 
@@ -723,17 +941,23 @@ class Azure extends AbstractAdapter
      * Get file modified time
      *
      * @param  string $filename
-     * @return int|string|bool
+     * @throws FileNotFoundException|UnableToReadFileException
+     * @return int|string
      */
-    public function getFileMTime(string $filename): int|string|bool
+    public function getFileMTime(string $filename): int|string
     {
         $info = $this->fetchFileInfo($filename);
+        if ($info['code'] == 404) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
         if (isset($info['headers']) && !empty($info['headers']['Last-Modified'])) {
             return $info['headers']['Last-Modified'];
         } else if (isset($info['headers']) && !empty($info['headers']['x-ms-creation-time'])) {
             return $info['headers']['x-ms-creation-time'];
         } else {
-            return false;
+            throw new UnableToReadFileException(
+                'Error: No modified time returned for \'' . $filename . '\'.'
+            );
         }
     }
 
@@ -741,15 +965,21 @@ class Azure extends AbstractAdapter
      * Create MD5 checksum of the file
      *
      * @param  string $filename
-     * @return string|bool
+     * @throws FileNotFoundException|UnableToReadFileException
+     * @return string
      */
-    public function md5File(string $filename): string|bool
+    public function md5File(string $filename): string
     {
         $info = $this->fetchFileInfo($filename);
+        if ($info['code'] == 404) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
         if (isset($info['headers']) && !empty($info['headers']['Content-MD5'])) {
             return $info['headers']['Content-MD5'];
         } else {
-            return false;
+            throw new UnableToReadFileException(
+                'Error: No MD5 checksum returned for \'' . $filename . '\'.'
+            );
         }
     }
 

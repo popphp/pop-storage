@@ -4,23 +4,26 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
  */
 
 /**
  * @namespace
  */
-namespace Pop\Storage\Adapter\Azure;
+namespace Pop\Storage\Exception;
+
+use Pop\Storage\Exception as StorageException;
 
 /**
- * Storage exception class
+ * Unable to create directory exception class
  *
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
- * @version    2.1.3
+ * @version    3.0.0
  */
-class Exception extends \Exception {}
+class UnableToCreateDirectoryException extends StorageException
+{}

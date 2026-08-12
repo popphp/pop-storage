@@ -3,6 +3,7 @@
 namespace Pop\Storage\Test;
 
 use PHPUnit\Framework\TestCase;
+use Pop\Storage\Exception\FileNotFoundException;
 use Pop\Storage\Storage;
 
 class StorageTest extends TestCase
@@ -249,7 +250,12 @@ class StorageTest extends TestCase
         $storage->uploadFile($file);
         $this->assertTrue($storage->fileExists('new-uploaded-file.txt'));
         $this->assertEquals('uploaded', $storage->fetchFile('new-uploaded-file.txt'));
-        $storage->deleteFile('uploaded.txt');
+        // 'uploaded.txt' was renamed to 'new-uploaded-file.txt' by uploadFile(), so it no longer
+        // exists under its original name.
+        try {
+            $storage->deleteFile('uploaded.txt');
+        } catch (FileNotFoundException) {
+        }
         $storage->deleteFile('new-uploaded-file.txt');
     }
 

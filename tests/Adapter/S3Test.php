@@ -4,6 +4,8 @@ namespace Pop\Storage\Test\Adapter;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\Group;
+use Pop\Storage\Exception\FileNotFoundException;
+use Pop\Storage\Exception\UnableToWriteFileException;
 use Pop\Storage\Storage;
 use Aws\S3;
 
@@ -179,8 +181,8 @@ class S3Test extends TestCase
     #[Group('skip')]
     public function testFileInfoNoFile()
     {
-        $info = $this->storage->fetchFileInfo('bad.txt');
-        $this->assertEmpty($info);
+        $this->expectException(FileNotFoundException::class);
+        $this->storage->fetchFileInfo('bad.txt');
     }
 
     #[Group('skip')]
@@ -211,7 +213,7 @@ class S3Test extends TestCase
     #[Group('skip')]
     public function testUploadFileException()
     {
-        $this->expectException('Pop\Storage\Adapter\Exception');
+        $this->expectException(UnableToWriteFileException::class);
         $file = [
             'size'     => 8,
             'error'    => 0
@@ -228,7 +230,8 @@ class S3Test extends TestCase
     #[Group('skip')]
     public function testMd5FileNoFile()
     {
-        $this->assertFalse($this->storage->md5File('/bad.txt'));
+        $this->expectException(FileNotFoundException::class);
+        $this->storage->md5File('/bad.txt');
     }
 
     #[Group('skip')]

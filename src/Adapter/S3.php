@@ -4,7 +4,7 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
  */
 
@@ -13,9 +13,20 @@
  */
 namespace Pop\Storage\Adapter;
 
+use Aws\Exception\AwsException;
 use Aws\S3\S3Client;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use Pop\Storage\Exception\DirectoryNotFoundException;
+use Pop\Storage\Exception\FileNotFoundException;
+use Pop\Storage\Exception\UnableToCopyFileException;
+use Pop\Storage\Exception\UnableToCreateDirectoryException;
+use Pop\Storage\Exception\UnableToDeleteDirectoryException;
+use Pop\Storage\Exception\UnableToDeleteFileException;
+use Pop\Storage\Exception\UnableToGenerateTemporaryUrlException;
+use Pop\Storage\Exception\UnableToMoveFileException;
+use Pop\Storage\Exception\UnableToReadFileException;
+use Pop\Storage\Exception\UnableToWriteFileException;
 
 /**
  * Storage adapter S3 class
@@ -23,9 +34,9 @@ use RecursiveIteratorIterator;
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
- * @version    2.1.3
+ * @version    3.0.0
  */
 class S3 extends AbstractAdapter
 {
@@ -89,104 +100,146 @@ class S3 extends AbstractAdapter
      */
     public function mkdir(string $directory): void
     {
-        $directory = $this->scrub($directory) . '/';
-        $bucket    = str_replace('s3://', '', $this->directory);
+        $key    = $this->scrub($directory) . '/';
+        $bucket = str_replace('s3://', '', $this->directory);
         if (str_contains($bucket, '/')) {
             $subfolder = substr($bucket, (strpos($bucket, '/') + 1));
-            $directory = $subfolder . $directory;
+            $key       = $subfolder . '/' . $key;
             $bucket    = substr($bucket, 0, strpos($bucket, '/'));
         }
 
-        $this->client->putObject([
-            'Bucket' => $bucket,
-            'Key'    => $directory,
-            'Body'   => ''
-        ]);
+        try {
+            $this->client->putObject(['Bucket' => $bucket, 'Key' => $key, 'Body' => '']);
+        } catch (AwsException $exception) {
+            throw new UnableToCreateDirectoryException(
+                'Error: Unable to create directory \'' . $directory . '\'.', 0, $exception
+            );
+        }
     }
 
     /**
      * Remove a directory
      *
      * @param  string $directory
-     * @throws \Pop\Dir\Exception
+     * @throws DirectoryNotFoundException
+     * @throws UnableToDeleteDirectoryException
      * @return void
      */
     public function rmdir(string $directory): void
     {
-        $directory = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($directory);
+        $path = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($directory);
+        if (!is_dir($path)) {
+            throw new DirectoryNotFoundException('Error: The directory \'' . $path . '\' was not found.');
+        }
+
         $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS),
+            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::CHILD_FIRST
         );
 
         foreach ($iterator as $fileInfo) {
-            if ($fileInfo->isDir()) {
-                rmdir((string)$fileInfo);
-            } else {
-                unlink((string)$fileInfo);
+            $ok = $fileInfo->isDir() ? @rmdir((string) $fileInfo) : @unlink((string) $fileInfo);
+            if (!$ok) {
+                throw new UnableToDeleteDirectoryException('Error: Unable to delete directory \'' . $path . '\'.');
             }
         }
 
-        rmdir($directory);
+        if (!@rmdir($path)) {
+            throw new UnableToDeleteDirectoryException('Error: Unable to delete directory \'' . $path . '\'.');
+        }
     }
 
     /**
      * List directories
      *
      * @param  ?string $search
+     * @param  bool    $recursive
      * @return array
      */
-    public function listDirs(?string $search = null): array
+    public function listDirs(?string $search = null, bool $recursive = false): array
     {
         $dirs   = [];
         $params = ['Bucket' => str_replace('s3://', '', $this->baseDirectory)];
-
+        if (!$recursive) {
+            $params['Delimiter'] = '/';
+        }
         if ($this->baseDirectory != $this->directory) {
             $params['Prefix'] = str_replace($this->baseDirectory . '/', '', $this->directory . '/');
         }
 
-        $objects = $this->client->listObjects($params);
-
-        foreach ($objects['Contents'] as $object) {
-            if ($object['Size'] == 0) {
-                $key = (isset($params['Prefix']) && str_starts_with($object['Key'], $params['Prefix'])) ?
-                    substr($object['Key'], strlen($params['Prefix'])) : $object['Key'];
-                if (substr_count($key, '/') == 1) {
-                    $dirs[] = $key;
+        try {
+            foreach ($this->client->getPaginator('ListObjects', $params) as $page) {
+                foreach ($page['CommonPrefixes'] ?? [] as $commonPrefix) {
+                    $dirs[] = (isset($params['Prefix']) && str_starts_with($commonPrefix['Prefix'], $params['Prefix'])) ?
+                        substr($commonPrefix['Prefix'], strlen($params['Prefix'])) : $commonPrefix['Prefix'];
+                }
+                if ($recursive) {
+                    // Without Delimiter, S3 never returns CommonPrefixes at all - every
+                    // intermediate directory (whether it holds an explicit zero-byte marker
+                    // or only real files) has to be derived from each object key's own path
+                    // segments instead, the same way Local's recursive walk reports a
+                    // directory just because something lives in it.
+                    foreach ($page['Contents'] ?? [] as $object) {
+                        $relativeKey = (isset($params['Prefix']) && str_starts_with($object['Key'], $params['Prefix'])) ?
+                            substr($object['Key'], strlen($params['Prefix'])) : $object['Key'];
+                        $segments = explode('/', rtrim($relativeKey, '/'));
+                        array_pop($segments); // the object's own name/marker, not a parent directory
+                        $path = '';
+                        foreach ($segments as $segment) {
+                            if ($segment === '') {
+                                continue;
+                            }
+                            $path  .= $segment . '/';
+                            $dirs[] = $path;
+                        }
+                    }
                 }
             }
+        } catch (AwsException $exception) {
+            throw new UnableToReadFileException('Error: Unable to list directories.', 0, $exception);
         }
+
+        $dirs = array_values(array_unique($dirs));
 
         if ($search !== null) {
             $dirs = $this->searchFilter($dirs, $search);
         }
 
         return $dirs;
-
     }
 
     /**
      * List files
      *
      * @param  ?string $search
+     * @param  bool    $recursive
      * @return array
      */
-    public function listFiles(?string $search = null): array
+    public function listFiles(?string $search = null, bool $recursive = false): array
     {
-        $files   = [];
-        $params  = ['Bucket' => str_replace('s3://', '', $this->baseDirectory), 'Delimiter' => '/'];
-
+        $files  = [];
+        $params = ['Bucket' => str_replace('s3://', '', $this->baseDirectory)];
+        if (!$recursive) {
+            $params['Delimiter'] = '/';
+        }
         if ($this->baseDirectory != $this->directory) {
             $params['Prefix'] = str_replace($this->baseDirectory . '/', '', $this->directory . '/');
         }
 
-        $objects = $this->client->listObjects($params);
-
-        foreach ($objects['Contents'] as $object) {
-            if (!isset($params['Prefix']) || ($object['Key'] != $params['Prefix'])) {
-                $files[] = (isset($params['Prefix']) && str_starts_with($object['Key'], $params['Prefix'])) ?
-                    substr($object['Key'], strlen($params['Prefix'])) : $object['Key'];
+        try {
+            foreach ($this->client->getPaginator('ListObjects', $params) as $page) {
+                foreach ($page['Contents'] ?? [] as $object) {
+                    $isDirectoryMarker = str_ends_with($object['Key'], '/') && (int) $object['Size'] === 0;
+                    $isCurrentPrefix   = isset($params['Prefix']) && ($object['Key'] === $params['Prefix']);
+                    if ($isDirectoryMarker || $isCurrentPrefix) {
+                        continue;
+                    }
+                    $files[] = (isset($params['Prefix']) && str_starts_with($object['Key'], $params['Prefix'])) ?
+                        substr($object['Key'], strlen($params['Prefix'])) : $object['Key'];
+                }
             }
+        } catch (AwsException $exception) {
+            throw new UnableToReadFileException('Error: Unable to list files.', 0, $exception);
         }
 
         if ($search !== null) {
@@ -205,12 +258,22 @@ class S3 extends AbstractAdapter
      */
     public function putFile(string $fileFrom, bool $copy = true): void
     {
-        if (file_exists($fileFrom)) {
-            if ($copy) {
-                copy($fileFrom, $this->directory . DIRECTORY_SEPARATOR . basename($fileFrom));
-            } else {
-                rename($fileFrom, $this->directory . DIRECTORY_SEPARATOR . basename($fileFrom));
-            }
+        if (!file_exists($fileFrom)) {
+            throw new FileNotFoundException('Error: The file \'' . $fileFrom . '\' was not found.');
+        }
+
+        $destination = $this->directory . DIRECTORY_SEPARATOR . basename($fileFrom);
+
+        if (!@copy($fileFrom, $destination)) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $fileFrom . '\'.');
+        }
+
+        // $copy = false means "move": PHP's rename() cannot bridge different stream wrapper
+        // protocols (a plain local path has none, the destination is s3://), so it can never
+        // succeed here the way it does for Local's same-wrapper rename() - copy the object,
+        // then remove the local source, to get the same move semantics.
+        if (!$copy && !@unlink($fileFrom)) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $fileFrom . '\'.');
         }
     }
 
@@ -223,23 +286,56 @@ class S3 extends AbstractAdapter
      */
     public function putFileContents(string $filename, string $fileContents): void
     {
-        file_put_contents($this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename), $fileContents);
+        if (@file_put_contents($this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename), $fileContents) === false) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $filename . '\'.');
+        }
+    }
+
+    /**
+     * Put file from a stream resource
+     *
+     * @param  string $filename
+     * @param  mixed  $resource
+     * @throws UnableToWriteFileException
+     * @return void
+     */
+    public function putFileStream(string $filename, mixed $resource): void
+    {
+        if (!is_resource($resource)) {
+            throw new UnableToWriteFileException('Error: The provided resource is not a valid stream.');
+        }
+
+        $destination = @fopen($this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename), 'w');
+        if ($destination === false) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $filename . '\'.');
+        }
+
+        stream_copy_to_stream($resource, $destination);
+        fclose($destination);
     }
 
     /**
      * Upload file from server request $_FILES['file']
      *
      * @param  array $file
-     * @throws Exception
+     * @throws UnableToWriteFileException|PathTraversalException
      * @return void
      */
     public function uploadFile(array $file): void
     {
         if (!isset($file['tmp_name']) || !isset($file['name'])) {
-            throw new Exception('Error: The uploaded file array was not valid');
+            throw new UnableToWriteFileException('Error: The uploaded file array was not valid.');
         }
 
-        file_put_contents($this->directory . DIRECTORY_SEPARATOR . $file['name'], file_get_contents($file['tmp_name']));
+        $contents = @file_get_contents($file['tmp_name']);
+        if ($contents === false) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $file['name'] . '\'.');
+        }
+
+        $destination = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($file['name']);
+        if (@file_put_contents($destination, $contents) === false) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $file['name'] . '\'.');
+        }
     }
 
     /**
@@ -253,8 +349,11 @@ class S3 extends AbstractAdapter
     {
         $sourceFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($sourceFile);
         $destFile   = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($destFile);
-        if (file_exists($sourceFile)) {
-            copy($sourceFile, $destFile);
+        if (!file_exists($sourceFile)) {
+            throw new FileNotFoundException('Error: The file \'' . $sourceFile . '\' was not found.');
+        }
+        if (!@copy($sourceFile, $destFile)) {
+            throw new UnableToCopyFileException('Error: Unable to copy file \'' . $sourceFile . '\'.');
         }
     }
 
@@ -268,8 +367,11 @@ class S3 extends AbstractAdapter
     public function copyFileToExternal(string $sourceFile, string $externalFile): void
     {
         $sourceFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($sourceFile);
-        if (file_exists($sourceFile)) {
-            copy($sourceFile, $externalFile);
+        if (!file_exists($sourceFile)) {
+            throw new FileNotFoundException('Error: The file \'' . $sourceFile . '\' was not found.');
+        }
+        if (!@copy($sourceFile, $externalFile)) {
+            throw new UnableToCopyFileException('Error: Unable to copy file \'' . $sourceFile . '\'.');
         }
     }
 
@@ -283,8 +385,11 @@ class S3 extends AbstractAdapter
     public function copyFileFromExternal(string $externalFile, string $destFile): void
     {
         $destFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($destFile);
-        if (file_exists($externalFile)) {
-            copy($externalFile, $destFile);
+        if (!file_exists($externalFile)) {
+            throw new FileNotFoundException('Error: The file \'' . $externalFile . '\' was not found.');
+        }
+        if (!@copy($externalFile, $destFile)) {
+            throw new UnableToCopyFileException('Error: Unable to copy file \'' . $externalFile . '\'.');
         }
     }
 
@@ -297,9 +402,12 @@ class S3 extends AbstractAdapter
      */
     public function moveFileToExternal(string $sourceFile, string $externalFile): void
     {
-        $oldFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($sourceFile);
-        if (file_exists($oldFile)) {
-            rename($oldFile, $externalFile);
+        $sourceFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($sourceFile);
+        if (!file_exists($sourceFile)) {
+            throw new FileNotFoundException('Error: The file \'' . $sourceFile . '\' was not found.');
+        }
+        if (!@rename($sourceFile, $externalFile)) {
+            throw new UnableToMoveFileException('Error: Unable to move file \'' . $sourceFile . '\'.');
         }
     }
 
@@ -313,8 +421,11 @@ class S3 extends AbstractAdapter
     public function moveFileFromExternal(string $externalFile, string $destFile): void
     {
         $destFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($destFile);
-        if (file_exists($externalFile)) {
-            rename($externalFile, $destFile);
+        if (!file_exists($externalFile)) {
+            throw new FileNotFoundException('Error: The file \'' . $externalFile . '\' was not found.');
+        }
+        if (!@rename($externalFile, $destFile)) {
+            throw new UnableToMoveFileException('Error: Unable to move file \'' . $externalFile . '\'.');
         }
     }
 
@@ -329,8 +440,11 @@ class S3 extends AbstractAdapter
     {
         $oldFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($oldFile);
         $newFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($newFile);
-        if (file_exists($oldFile)) {
-            rename($oldFile, $newFile);
+        if (!file_exists($oldFile)) {
+            throw new FileNotFoundException('Error: The file \'' . $oldFile . '\' was not found.');
+        }
+        if (!@rename($oldFile, $newFile)) {
+            throw new UnableToMoveFileException('Error: Unable to move file \'' . $oldFile . '\'.');
         }
     }
 
@@ -344,8 +458,11 @@ class S3 extends AbstractAdapter
     public function replaceFileContents(string $filename, string $fileContents): void
     {
         $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
-        if (file_exists($filename)) {
-            file_put_contents($filename, $fileContents);
+        if (!file_exists($filename)) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
+        if (@file_put_contents($filename, $fileContents) === false) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $filename . '\'.');
         }
     }
 
@@ -358,8 +475,11 @@ class S3 extends AbstractAdapter
     public function deleteFile(string $filename): void
     {
         $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
-        if (file_exists($filename)) {
-            unlink($filename);
+        if (!file_exists($filename)) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
+        if (!@unlink($filename)) {
+            throw new UnableToDeleteFileException('Error: Unable to delete file \'' . $filename . '\'.');
         }
     }
 
@@ -372,7 +492,27 @@ class S3 extends AbstractAdapter
     public function fetchFile(string $filename): mixed
     {
         $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
-        return (file_exists($filename)) ? file_get_contents($filename) : false;
+        if (!file_exists($filename)) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
+        return file_get_contents($filename);
+    }
+
+    /**
+     * Fetch file as a stream resource
+     *
+     * @param  string $filename
+     * @throws FileNotFoundException
+     * @return mixed
+     */
+    public function fetchFileStream(string $filename): mixed
+    {
+        $path = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
+        if (!file_exists($path)) {
+            throw new FileNotFoundException('Error: The file \'' . $path . '\' was not found.');
+        }
+
+        return fopen($path, 'r');
     }
 
     /**
@@ -383,15 +523,45 @@ class S3 extends AbstractAdapter
      */
     public function fetchFileInfo(string $filename): array
     {
-        if (file_exists($this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename))) {
+        $path = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
+        if (!file_exists($path)) {
+            throw new FileNotFoundException('Error: The file \'' . $path . '\' was not found.');
+        }
+
+        try {
             $fileObject = $this->client->headObject([
                 'Bucket' => str_replace('s3://', '', $this->directory),
                 'Key'    => $this->scrub($filename),
             ]);
-
             return $fileObject->toArray();
-        } else {
-            return [];
+        } catch (AwsException $exception) {
+            throw new UnableToReadFileException(
+                'Error: Unable to read file info for \'' . $filename . '\'.', 0, $exception
+            );
+        }
+    }
+
+    /**
+     * Get a temporary (presigned) URL for the file, valid for $expiresInSeconds
+     *
+     * @param  string $filename
+     * @param  int    $expiresInSeconds
+     * @throws UnableToGenerateTemporaryUrlException
+     * @return string
+     */
+    public function getTemporaryUrl(string $filename, int $expiresInSeconds = 900): string
+    {
+        $bucket = str_replace('s3://', '', $this->baseDirectory);
+        $key    = str_replace($this->baseDirectory . '/', '', $this->directory . '/') . $this->scrub($filename);
+
+        try {
+            $command = $this->client->getCommand('GetObject', ['Bucket' => $bucket, 'Key' => $key]);
+            $request = $this->client->createPresignedRequest($command, '+' . $expiresInSeconds . ' seconds');
+            return (string) $request->getUri();
+        } catch (AwsException $exception) {
+            throw new UnableToGenerateTemporaryUrlException(
+                'Error: Unable to generate a temporary URL for \'' . $filename . '\'.', 0, $exception
+            );
         }
     }
 
@@ -432,56 +602,80 @@ class S3 extends AbstractAdapter
      * Get file size
      *
      * @param  string $filename
-     * @return int|bool
+     * @throws FileNotFoundException
+     * @return int
      */
-    public function getFileSize(string $filename): int|bool
+    public function getFileSize(string $filename): int
     {
         $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
-        return (file_exists($filename)) ? filesize($filename) : false;
+        if (!file_exists($filename)) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
+        return filesize($filename);
     }
 
     /**
      * Get file type
      *
      * @param  string $filename
-     * @return string|bool
+     * @throws FileNotFoundException
+     * @return string
      */
-    public function getFileType(string $filename): string|bool
+    public function getFileType(string $filename): string
     {
         $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
-        return (file_exists($filename)) ? filetype($filename) : false;
+        if (!file_exists($filename)) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
+        return filetype($filename);
     }
 
     /**
      * Get file modified time
      *
      * @param  string $filename
-     * @return int|string|bool
+     * @throws FileNotFoundException
+     * @return int|string
      */
-    public function getFileMTime(string $filename): int|string|bool
+    public function getFileMTime(string $filename): int|string
     {
         $filename = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
-        return (file_exists($filename)) ? filemtime($filename) : false;
+        if (!file_exists($filename)) {
+            throw new FileNotFoundException('Error: The file \'' . $filename . '\' was not found.');
+        }
+        return filemtime($filename);
     }
 
     /**
      * Create MD5 checksum of the file
      *
      * @param  string $filename
-     * @return string|bool
+     * @throws FileNotFoundException
+     * @return string
      */
-    public function md5File(string $filename): string|bool
+    public function md5File(string $filename): string
     {
-        if (file_exists($this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename))) {
+        $path = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
+        if (!file_exists($path)) {
+            throw new FileNotFoundException('Error: The file \'' . $path . '\' was not found.');
+        }
+
+        try {
             $fileObject = $this->client->getObject([
                 'Bucket' => str_replace('s3://', '', $this->baseDirectory),
                 'Key'    => str_replace($this->baseDirectory . '/', '', $this->directory . '/') . $this->scrub($filename),
             ]);
-
-            return (isset($fileObject['ETag'])) ? str_replace('"', '', $fileObject['ETag']) : false;
-        } else {
-            return false;
+        } catch (AwsException $exception) {
+            throw new UnableToReadFileException(
+                'Error: Unable to read file \'' . $filename . '\'.', 0, $exception
+            );
         }
+
+        if (!isset($fileObject['ETag'])) {
+            throw new UnableToReadFileException('Error: No ETag/checksum returned for \'' . $filename . '\'.');
+        }
+
+        return str_replace('"', '', $fileObject['ETag']);
     }
 
 }

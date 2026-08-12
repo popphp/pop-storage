@@ -4,7 +4,7 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
  */
 
@@ -21,9 +21,9 @@ use Pop\Storage\Adapter\AbstractAdapter;
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
- * @version    2.1.3
+ * @version    3.0.0
  */
 abstract class AbstractStorage implements StorageInterface
 {
@@ -126,25 +126,28 @@ abstract class AbstractStorage implements StorageInterface
      * List all
      *
      * @param  ?string $search
+     * @param  bool    $recursive
      * @return array
      */
-    abstract public function listAll(?string $search = null): array;
+    abstract public function listAll(?string $search = null, bool $recursive = false): array;
 
     /**
      * List directories
      *
      * @param  ?string $search
+     * @param  bool    $recursive
      * @return array
      */
-    abstract public function listDirs(?string $search = null): array;
+    abstract public function listDirs(?string $search = null, bool $recursive = false): array;
 
     /**
      * List files
      *
      * @param  ?string $search
+     * @param  bool    $recursive
      * @return array
      */
-    abstract public function listFiles(?string $search = null): array;
+    abstract public function listFiles(?string $search = null, bool $recursive = false): array;
 
     /**
      * Put file
@@ -163,6 +166,15 @@ abstract class AbstractStorage implements StorageInterface
      * @return void
      */
     abstract public function putFileContents(string $filename, string $fileContents): void;
+
+    /**
+     * Put file from a stream resource
+     *
+     * @param  string $filename
+     * @param  mixed  $resource
+     * @return void
+     */
+    abstract public function putFileStream(string $filename, mixed $resource): void;
 
     /**
      * Upload file from server request $_FILES['file']
@@ -252,12 +264,29 @@ abstract class AbstractStorage implements StorageInterface
     abstract public function fetchFile(string $filename): mixed;
 
     /**
+     * Fetch file as a stream resource
+     *
+     * @param  string $filename
+     * @return mixed
+     */
+    abstract public function fetchFileStream(string $filename): mixed;
+
+    /**
      * Fetch file info
      *
      * @param  string $filename
      * @return array
      */
     abstract public function fetchFileInfo(string $filename): array;
+
+    /**
+     * Get a temporary (presigned) URL for the file, valid for $expiresInSeconds
+     *
+     * @param  string $filename
+     * @param  int    $expiresInSeconds
+     * @return string
+     */
+    abstract public function getTemporaryUrl(string $filename, int $expiresInSeconds = 900): string;
 
     /**
      * File exists
@@ -287,32 +316,32 @@ abstract class AbstractStorage implements StorageInterface
      * Get file size
      *
      * @param  string $filename
-     * @return int|bool
+     * @return int
      */
-    abstract public function getFileSize(string $filename): int|bool;
+    abstract public function getFileSize(string $filename): int;
 
     /**
      * Get file type
      *
      * @param  string $filename
-     * @return string|bool
+     * @return string
      */
-    abstract public function getFileType(string $filename): string|bool;
+    abstract public function getFileType(string $filename): string;
 
     /**
      * Get file modified time
      *
      * @param  string $filename
-     * @return int|string|bool
+     * @return int|string
      */
-    abstract public function getFileMTime(string $filename): int|string|bool;
+    abstract public function getFileMTime(string $filename): int|string;
 
     /**
      * Create MD5 checksum of the file
      *
      * @param  string $filename
-     * @return string|bool
+     * @return string
      */
-    abstract public function md5File(string $filename): string|bool;
+    abstract public function md5File(string $filename): string;
 
 }

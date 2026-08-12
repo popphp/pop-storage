@@ -4,7 +4,7 @@
  *
  * @link       https://github.com/popphp/popphp-framework
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
  */
 
@@ -21,9 +21,9 @@ use Aws\S3\S3Client;
  * @category   Pop
  * @package    Pop\Storage
  * @author     Nick Sagona, III <dev@noladev.com>
- * @copyright  Copyright (c) 2009-2026 NOLA Interactive, LLC.
+ * @copyright  Copyright (c) 2009-2027 NOLA Interactive, LLC.
  * @license    https://www.popphp.org/license     New BSD License
- * @version    2.1.3
+ * @version    3.0.0
  */
 class Storage extends AbstractStorage
 {
@@ -138,33 +138,36 @@ class Storage extends AbstractStorage
      * List all
      *
      * @param  ?string $search
+     * @param  bool    $recursive
      * @return array
      */
-    public function listAll(?string $search = null): array
+    public function listAll(?string $search = null, bool $recursive = false): array
     {
-        return $this->adapter->listAll($search);
+        return $this->adapter->listAll($search, $recursive);
     }
 
     /**
      * List directories
      *
      * @param  ?string $search
+     * @param  bool    $recursive
      * @return array
      */
-    public function listDirs(?string $search = null): array
+    public function listDirs(?string $search = null, bool $recursive = false): array
     {
-        return $this->adapter->listDirs($search);
+        return $this->adapter->listDirs($search, $recursive);
     }
 
     /**
      * List files
      *
      * @param  ?string $search
+     * @param  bool    $recursive
      * @return array
      */
-    public function listFiles(?string $search = null): array
+    public function listFiles(?string $search = null, bool $recursive = false): array
     {
-        return $this->adapter->listFiles($search);
+        return $this->adapter->listFiles($search, $recursive);
     }
 
     /**
@@ -189,6 +192,18 @@ class Storage extends AbstractStorage
     public function putFileContents(string $filename, string $fileContents): void
     {
         $this->adapter->putFileContents($filename, $fileContents);
+    }
+
+    /**
+     * Put file from a stream resource
+     *
+     * @param  string $filename
+     * @param  mixed  $resource
+     * @return void
+     */
+    public function putFileStream(string $filename, mixed $resource): void
+    {
+        $this->adapter->putFileStream($filename, $resource);
     }
 
     /**
@@ -322,6 +337,17 @@ class Storage extends AbstractStorage
     }
 
     /**
+     * Fetch file as a stream resource
+     *
+     * @param  string $filename
+     * @return mixed
+     */
+    public function fetchFileStream(string $filename): mixed
+    {
+        return $this->adapter->fetchFileStream($filename);
+    }
+
+    /**
      * Fetch file info
      *
      * @param  string $filename
@@ -330,6 +356,18 @@ class Storage extends AbstractStorage
     public function fetchFileInfo(string $filename): array
     {
         return $this->adapter->fetchFileInfo($filename);
+    }
+
+    /**
+     * Get a temporary (presigned) URL for the file, valid for $expiresInSeconds
+     *
+     * @param  string $filename
+     * @param  int    $expiresInSeconds
+     * @return string
+     */
+    public function getTemporaryUrl(string $filename, int $expiresInSeconds = 900): string
+    {
+        return $this->adapter->getTemporaryUrl($filename, $expiresInSeconds);
     }
 
     /**
@@ -369,9 +407,9 @@ class Storage extends AbstractStorage
      * Get file size
      *
      * @param  string $filename
-     * @return int|bool
+     * @return int
      */
-    public function getFileSize(string $filename): int|bool
+    public function getFileSize(string $filename): int
     {
         return $this->adapter->getFileSize($filename);
     }
@@ -380,9 +418,9 @@ class Storage extends AbstractStorage
      * Get file type
      *
      * @param  string $filename
-     * @return string|bool
+     * @return string
      */
-    public function getFileType(string $filename): string|bool
+    public function getFileType(string $filename): string
     {
         return $this->adapter->getFileType($filename);
     }
@@ -391,9 +429,9 @@ class Storage extends AbstractStorage
      * Get file modified time
      *
      * @param  string $filename
-     * @return int|string|bool
+     * @return int|string
      */
-    public function getFileMTime(string $filename): int|string|bool
+    public function getFileMTime(string $filename): int|string
     {
         return $this->adapter->getFileMTime($filename);
     }
@@ -402,9 +440,9 @@ class Storage extends AbstractStorage
      * Create MD5 checksum of the file
      *
      * @param  string $filename
-     * @return string|bool
+     * @return string
      */
-    public function md5File(string $filename): string|bool
+    public function md5File(string $filename): string
     {
         return $this->adapter->md5File($filename);
     }
