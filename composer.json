@@ -23,7 +23,7 @@
         "php": ">=8.4.0",
         "popphp/pop-dir": "^4.0.3",
         "popphp/pop-http": "^6.0.0-beta.4",
-        "popphp/pop-utils": "^2.5.0-beta.2",
+        "popphp/pop-utils": "^3.0.0-3.0.0-beta.2",
         "aws/aws-sdk-php": "^3.339.12"
     },
     "require-dev": {
@@ -42,8 +42,6 @@
     "scripts": {
         "test": "vendor/bin/phpunit --exclude-group skip"
     },
-    "minimum-stability": "dev",
-    "prefer-stable": true,
     "extra": {
         "branch-alias": {
             "dev-master": "3.0.x-dev"
