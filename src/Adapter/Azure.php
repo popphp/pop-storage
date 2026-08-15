@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Pop PHP Framework (https://www.popphp.org/)
  *
@@ -169,6 +170,25 @@ class Azure extends AbstractAdapter
     public function hasClient(): bool
     {
         return ($this->client !== null);
+    }
+
+    /**
+     * Get the current client's request, narrowed to the concrete request type
+     * initClient() always constructs (the client base class declares the wider
+     * AbstractRequest return type)
+     *
+     * @throws \Pop\Storage\Exception
+     * @return Request
+     */
+    protected function getClientRequest(): Request
+    {
+        $request = $this->client?->getRequest();
+
+        if (!($request instanceof Request)) {
+            throw new \Pop\Storage\Exception('Error: The client has not been initialized with a request.');
+        }
+
+        return $request;
     }
 
     /**
@@ -373,9 +393,9 @@ class Azure extends AbstractAdapter
             }
 
             $this->initClient();
-            $this->client->getRequest()->setQuery($params);
-            $this->client->getRequest()->setUri($uri);
-            $this->auth->signRequest($this->client->getRequest());
+            $this->getClientRequest()->setQuery($params);
+            $this->getClientRequest()->setUri($uri);
+            $this->auth->signRequest($this->getClientRequest());
             $response = $this->client->send();
 
             if (is_array($response) && !empty($response['Blobs']) && !empty($response['Blobs']['Blob'])) {
@@ -424,13 +444,13 @@ class Azure extends AbstractAdapter
         $fileContents = file_get_contents($fileFrom);
 
         $this->initClient('PUT', [
-            'content-length'         => strlen($fileContents),
+            'content-length'         => (string)strlen($fileContents),
             'x-ms-blob-type'         => 'BlockBlob',
             'x-ms-blob-content-type' => File::getFileMimeType($fileFrom) ?? self::DEFAULT_CONTENT_TYPE
         ], false);
-        $this->client->getRequest()->setUri($uri);
-        $this->client->getRequest()->setBody($fileContents);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($uri);
+        $this->getClientRequest()->setBody($fileContents);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if (!$response->isSuccess()) {
@@ -450,13 +470,13 @@ class Azure extends AbstractAdapter
         $uri = $this->resolveUri($filename);
 
         $this->initClient('PUT', [
-            'content-length'         => strlen($fileContents),
+            'content-length'         => (string)strlen($fileContents),
             'x-ms-blob-type'         => 'BlockBlob',
             'x-ms-blob-content-type' => File::getFileMimeType($filename) ?? self::DEFAULT_CONTENT_TYPE
         ], false);
-        $this->client->getRequest()->setUri($uri);
-        $this->client->getRequest()->setBody($fileContents);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($uri);
+        $this->getClientRequest()->setBody($fileContents);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if (!$response->isSuccess()) {
@@ -485,13 +505,13 @@ class Azure extends AbstractAdapter
         $body->setContentFromStream($resource);
 
         $this->initClient('PUT', [
-            'content-length'         => $stat['size'],
+            'content-length'         => (string)$stat['size'],
             'x-ms-blob-type'         => 'BlockBlob',
             'x-ms-blob-content-type' => File::getFileMimeType($filename) ?? self::DEFAULT_CONTENT_TYPE
         ], false);
-        $this->client->getRequest()->setUri($uri);
-        $this->client->getRequest()->setBody($body);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($uri);
+        $this->getClientRequest()->setBody($body);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if (!$response->isSuccess()) {
@@ -520,13 +540,13 @@ class Azure extends AbstractAdapter
         $fileContents = file_get_contents($file['tmp_name']);
 
         $this->initClient('PUT', [
-            'content-length'         => strlen($fileContents),
+            'content-length'         => (string)strlen($fileContents),
             'x-ms-blob-type'         => 'BlockBlob',
             'x-ms-blob-content-type' => File::getFileMimeType($file['name']) ?? self::DEFAULT_CONTENT_TYPE
         ], false);
-        $this->client->getRequest()->setUri($uri);
-        $this->client->getRequest()->setBody($fileContents);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($uri);
+        $this->getClientRequest()->setBody($fileContents);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if (!$response->isSuccess()) {
@@ -556,8 +576,8 @@ class Azure extends AbstractAdapter
             'content-length'   => $sourceFileInfo['headers']['Content-Length'],
             'x-ms-copy-source' => $this->auth->getBaseUri() . $sourceUri,
         ], false);
-        $this->client->getRequest()->setUri($destUri);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($destUri);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if (!$response->isSuccess()) {
@@ -586,8 +606,8 @@ class Azure extends AbstractAdapter
             'content-length'   => $sourceFileInfo['headers']['Content-Length'],
             'x-ms-copy-source' => $this->auth->getBaseUri() . $sourceUri,
         ], false);
-        $this->client->getRequest()->setUri($externalFile);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($externalFile);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if (!$response->isSuccess()) {
@@ -605,8 +625,8 @@ class Azure extends AbstractAdapter
     public function copyFileFromExternal(string $externalFile, string $destFile): void
     {
         $this->initClient('HEAD', [], false);
-        $this->client->getRequest()->setUri($externalFile);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($externalFile);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if ($response->getCode() === 404) {
@@ -622,8 +642,8 @@ class Azure extends AbstractAdapter
             'content-length'   => $response->getHeaderValueAsString('Content-Length'),
             'x-ms-copy-source' => $this->auth->getBaseUri() . $externalFile,
         ], false);
-        $this->client->getRequest()->setUri($destUri);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($destUri);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if (!$response->isSuccess()) {
@@ -668,8 +688,8 @@ class Azure extends AbstractAdapter
         }
 
         $this->initClient('DELETE', $headers, false);
-        $this->client->getRequest()->setUri($externalFile);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($externalFile);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if ($response->getCode() === 404) {
@@ -734,8 +754,8 @@ class Azure extends AbstractAdapter
         }
 
         $this->initClient('DELETE', $headers, false);
-        $this->client->getRequest()->setUri($uri);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($uri);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if ($response->getCode() === 404) {
@@ -758,8 +778,8 @@ class Azure extends AbstractAdapter
         $uri = $this->resolveUri($filename);
 
         $this->initClient('GET', [], false);
-        $this->client->getRequest()->setUri($uri);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($uri);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if ($response->getCode() === 404) {
@@ -784,8 +804,8 @@ class Azure extends AbstractAdapter
         $uri = $this->resolveUri($filename);
 
         $this->initClient('GET', [], false);
-        $this->client->getRequest()->setUri($uri);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($uri);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         if ($response->getCode() === 404) {
@@ -821,8 +841,8 @@ class Azure extends AbstractAdapter
         $uri = $this->resolveUri($filename);
 
         $this->initClient('HEAD', [], false);
-        $this->client->getRequest()->setUri($uri);
-        $this->auth->signRequest($this->client->getRequest());
+        $this->getClientRequest()->setUri($uri);
+        $this->auth->signRequest($this->getClientRequest());
         $response = $this->client->send();
 
         return [

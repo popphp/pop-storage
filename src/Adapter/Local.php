@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Pop PHP Framework (https://www.popphp.org/)
  *
@@ -17,6 +18,7 @@ use Pop\Dir\Dir;
 use Pop\Utils\File;
 use Pop\Storage\Exception\DirectoryNotFoundException;
 use Pop\Storage\Exception\FileNotFoundException;
+use Pop\Storage\Exception\PathTraversalException;
 use Pop\Storage\Exception\UnableToCopyFileException;
 use Pop\Storage\Exception\UnableToCreateDirectoryException;
 use Pop\Storage\Exception\UnableToDeleteDirectoryException;
