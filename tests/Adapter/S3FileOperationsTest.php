@@ -5,6 +5,7 @@ namespace Pop\Storage\Test\Adapter;
 use Aws\Exception\AwsException;
 use Aws\MockHandler;
 use Aws\Result;
+use Aws\S3\Exception\S3Exception;
 use Aws\S3\S3Client;
 use PHPUnit\Framework\TestCase;
 use Pop\Storage\Exception\FileNotFoundException;
@@ -530,7 +531,15 @@ class S3FileOperationsTest extends TestCase
 
     public function testMd5FileThrowsFileNotFoundExceptionForMissingKey()
     {
-        $storage = Storage::createS3($this->uniqueBucket(), $this->createClient(new MockHandler([])));
+        $bucket  = $this->uniqueBucket();
+        $handler = new MockHandler([]);
+        $client  = $this->createClient($handler);
+        $storage = Storage::createS3($bucket, $client);
+        $command = $client->getCommand('HeadObject', ['Bucket' => str_replace('s3://', '', $bucket), 'Key' => 'missing.txt']);
+        $handler->append(new AwsException('Not Found', $command, [
+            'code'     => 'NotFound',
+            'response' => new \GuzzleHttp\Psr7\Response(404),
+        ]));
 
         $this->expectException(FileNotFoundException::class);
         $storage->md5File('missing.txt');
@@ -538,25 +547,13 @@ class S3FileOperationsTest extends TestCase
 
     public function testMd5FileThrowsUnableToReadFileExceptionWhenNoEtagIsReturned()
     {
+        // md5File() now reads the ETag off a single HeadObject call - a success response
+        // missing the ETag key entirely is a malformed-but-successful response.
         $bucket  = $this->uniqueBucket();
-        $handler = new MockHandler([]);
+        $handler = new MockHandler([
+            new Result(['ContentLength' => 8, 'LastModified' => 'Mon, 01 Jan 2024 00:00:00 GMT']),
+        ]);
         $storage = Storage::createS3($bucket, $this->createClient($handler));
-        // A HeadObject success (for the file_exists() pre-check) followed by a GetObject
-        // success that's missing the ETag key entirely - a malformed-but-successful response.
-        $handler->append(function ($command) {
-            return match ($command->getName()) {
-                'HeadObject' => new Result(['ContentLength' => 8, 'LastModified' => 'Mon, 01 Jan 2024 00:00:00 GMT']),
-                'GetObject'  => new Result(['Body' => \GuzzleHttp\Psr7\Utils::streamFor('contents')]),
-                default      => new Result([]),
-            };
-        });
-        $handler->append(function ($command) {
-            return match ($command->getName()) {
-                'HeadObject' => new Result(['ContentLength' => 8, 'LastModified' => 'Mon, 01 Jan 2024 00:00:00 GMT']),
-                'GetObject'  => new Result(['Body' => \GuzzleHttp\Psr7\Utils::streamFor('contents')]),
-                default      => new Result([]),
-            };
-        });
 
         $this->expectException(\Pop\Storage\Exception\UnableToReadFileException::class);
         $storage->md5File('test.txt');
@@ -624,15 +621,14 @@ class S3FileOperationsTest extends TestCase
         $storage->fetchFileInfo('test.txt');
     }
 
-    public function testMd5FileThrowsUnableToReadFileExceptionWhenTheGetObjectCallFails()
+    public function testMd5FileThrowsUnableToReadFileExceptionWhenTheHeadObjectCallFails()
     {
         $bucket  = $this->uniqueBucket();
         $handler = new MockHandler([]);
         $client  = $this->createClient($handler);
         $storage = Storage::createS3($bucket, $client);
 
-        $this->queueHappyPathResponses($handler, 1);
-        $command = $client->getCommand('GetObject', ['Bucket' => str_replace('s3://', '', $bucket), 'Key' => 'test.txt']);
+        $command = $client->getCommand('HeadObject', ['Bucket' => str_replace('s3://', '', $bucket), 'Key' => 'test.txt']);
         $handler->append(new AwsException('Access Denied', $command, ['code' => 'AccessDenied']));
 
         $this->expectException(\Pop\Storage\Exception\UnableToReadFileException::class);
@@ -662,6 +658,61 @@ class S3FileOperationsTest extends TestCase
         $storage = Storage::createS3($bucket, $this->createClient($handler));
 
         $this->assertEquals(['keep/'], $storage->listDirs('keep*'));
+    }
+
+    public function testRmdirDeletesAllObjectsUnderThePrefixInABatch()
+    {
+        $bucket    = $this->uniqueBucket();
+        $handler   = new MockHandler([]);
+        $client    = $this->createClient($handler);
+        $storage   = Storage::createS3($bucket, $client);
+        $rawBucket = str_replace('s3://', '', $bucket);
+
+        // is_dir()'s stream-wrapper pre-check: HeadObject on the bare key 404s, so the
+        // wrapper falls back to a prefix listing to confirm objects exist under it.
+        $headCommand = $client->getCommand('HeadObject', ['Bucket' => $rawBucket, 'Key' => 'sub']);
+        $handler->append(new S3Exception('Not Found', $headCommand, [
+            'code'     => 'NotFound',
+            'response' => new \GuzzleHttp\Psr7\Response(404),
+        ]));
+        $handler->append(new Result(['Contents' => [['Key' => 'sub/a.txt']], 'CommonPrefixes' => []]));
+
+        // rmdir()'s own listing of everything under the prefix, then a single batched delete.
+        $handler->append(new Result(['Contents' => [
+            ['Key' => 'sub/a.txt', 'Size' => 4],
+            ['Key' => 'sub/b.txt', 'Size' => 4],
+        ]]));
+        $handler->append(new Result(['Deleted' => [['Key' => 'sub/a.txt'], ['Key' => 'sub/b.txt']]]));
+
+        $storage->rmdir('sub');
+
+        $lastCommand = $handler->getLastCommand();
+        $this->assertEquals('DeleteObjects', $lastCommand->getName());
+        $this->assertEquals(
+            [['Key' => 'sub/a.txt'], ['Key' => 'sub/b.txt']],
+            $lastCommand['Delete']['Objects']
+        );
+    }
+
+    public function testRmdirThrowsUnableToDeleteDirectoryExceptionWhenDeleteObjectsReturnsErrors()
+    {
+        $bucket    = $this->uniqueBucket();
+        $handler   = new MockHandler([]);
+        $client    = $this->createClient($handler);
+        $storage   = Storage::createS3($bucket, $client);
+        $rawBucket = str_replace('s3://', '', $bucket);
+
+        $headCommand = $client->getCommand('HeadObject', ['Bucket' => $rawBucket, 'Key' => 'sub']);
+        $handler->append(new S3Exception('Not Found', $headCommand, [
+            'code'     => 'NotFound',
+            'response' => new \GuzzleHttp\Psr7\Response(404),
+        ]));
+        $handler->append(new Result(['Contents' => [['Key' => 'sub/a.txt']], 'CommonPrefixes' => []]));
+        $handler->append(new Result(['Contents' => [['Key' => 'sub/a.txt', 'Size' => 4]]]));
+        $handler->append(new Result(['Errors' => [['Key' => 'sub/a.txt', 'Code' => 'AccessDenied']]]));
+
+        $this->expectException(\Pop\Storage\Exception\UnableToDeleteDirectoryException::class);
+        $storage->rmdir('sub');
     }
 
     public function testRmdirThrowsDirectoryNotFoundExceptionForMissingDirectory()

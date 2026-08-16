@@ -35,6 +35,19 @@ class S3ExceptionsTest extends TestCase
         $storage->fetchFileInfo('does-not-exist.txt');
     }
 
+    public function testBucketWithoutS3PrefixIsNormalizedTheSameAsWithIt()
+    {
+        $handler = new MockHandler();
+        $storage = Storage::createS3('my-bucket', $this->createClient($handler));
+        $handler->append(new Result([]));
+
+        $storage->mkdir('new-folder');
+
+        $lastCommand = $handler->getLastCommand();
+        $this->assertEquals('my-bucket', $lastCommand['Bucket']);
+        $this->assertEquals('s3://my-bucket', $storage->adapter()->getBaseDir());
+    }
+
     public function testMkdirThrowsUnableToCreateDirectoryExceptionOnSdkFailure()
     {
         $handler = new MockHandler();

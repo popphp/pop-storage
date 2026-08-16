@@ -384,6 +384,7 @@ class Azure extends AbstractAdapter
         }
 
         $pageCount = 0;
+        $this->initClient();
 
         do {
             if (++$pageCount > static::MAX_LIST_PAGES) {
@@ -392,7 +393,10 @@ class Azure extends AbstractAdapter
                 );
             }
 
-            $this->initClient();
+            // Reuse the same client/request across pages instead of rebuilding the whole
+            // object graph via initClient() every iteration - only the Date header (part of
+            // the signed string), query and signature need to be refreshed per page.
+            $this->getClientRequest()->addHeader('Date', gmdate('D, d M Y H:i:s T'));
             $this->getClientRequest()->setQuery($params);
             $this->getClientRequest()->setUri($uri);
             $this->auth->signRequest($this->getClientRequest());

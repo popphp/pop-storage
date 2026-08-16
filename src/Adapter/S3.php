@@ -16,8 +16,6 @@ namespace Pop\Storage\Adapter;
 
 use Aws\Exception\AwsException;
 use Aws\S3\S3Client;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
 use Pop\Storage\Exception\DirectoryNotFoundException;
 use Pop\Storage\Exception\FileNotFoundException;
 use Pop\Storage\Exception\PathTraversalException;
@@ -59,6 +57,30 @@ class S3 extends AbstractAdapter
     {
         parent::__construct($directory);
         $this->setClient($client);
+    }
+
+    /**
+     * Set base directory - normalizes the bucket to always carry the 's3://'
+     * prefix the stream wrapper requires, so callers can pass either
+     * 'my-bucket' or 's3://my-bucket'
+     *
+     * @param  ?string $directory
+     * @return void
+     */
+    public function setBaseDir(?string $directory = null): void
+    {
+        parent::setBaseDir(empty($directory) ? $directory : static::withS3Prefix($directory));
+    }
+
+    /**
+     * Prepend the 's3://' prefix the stream wrapper requires, if it isn't already there
+     *
+     * @param  string $path
+     * @return string
+     */
+    protected static function withS3Prefix(string $path): string
+    {
+        return str_starts_with($path, 's3://') ? $path : 's3://' . $path;
     }
 
     /**
@@ -134,21 +156,40 @@ class S3 extends AbstractAdapter
             throw new DirectoryNotFoundException('Error: The directory \'' . $path . '\' was not found.');
         }
 
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST
-        );
+        $bucket = str_replace('s3://', '', $this->baseDirectory);
+        $prefix = str_replace($this->baseDirectory . '/', '', $path) . '/';
 
-        foreach ($iterator as $fileInfo) {
-            $ok = $fileInfo->isDir() ? @rmdir((string) $fileInfo) : @unlink((string) $fileInfo);
-            if (!$ok) {
-                throw new UnableToDeleteDirectoryException('Error: Unable to delete directory \'' . $path . '\'.');
+        try {
+            $keys = [];
+            foreach ($this->client->getPaginator('ListObjects', ['Bucket' => $bucket, 'Prefix' => $prefix]) as $page) {
+                foreach ($page['Contents'] ?? [] as $object) {
+                    $keys[] = ['Key' => $object['Key']];
+                }
             }
+
+            // Batch the deletes via S3's DeleteObjects API (up to 1000 keys per request)
+            // instead of one DeleteObject round trip per file.
+            foreach (array_chunk($keys, 1000) as $batch) {
+                $result = $this->client->deleteObjects([
+                    'Bucket' => $bucket,
+                    'Delete' => ['Objects' => $batch, 'Quiet' => true],
+                ]);
+                if (!empty($result['Errors'])) {
+                    throw new UnableToDeleteDirectoryException('Error: Unable to delete directory \'' . $path . '\'.');
+                }
+            }
+        } catch (AwsException $exception) {
+            throw new UnableToDeleteDirectoryException(
+                'Error: Unable to delete directory \'' . $path . '\'.', 0, $exception
+            );
         }
 
-        if (!@rmdir($path)) {
-            throw new UnableToDeleteDirectoryException('Error: Unable to delete directory \'' . $path . '\'.');
-        }
+        // deleteObjects() is a raw SDK call that bypasses the stream wrapper, so it never
+        // invalidates the wrapper's own url_stat() cache - the is_dir() check above may have
+        // just warmed a stale "exists" entry for $path. unlink() clears that cache entry
+        // unconditionally before its own (here redundant, harmless - S3 doesn't error
+        // deleting an already-gone key) DeleteObject call.
+        @unlink($path);
     }
 
     /**
@@ -312,8 +353,12 @@ class S3 extends AbstractAdapter
             throw new UnableToWriteFileException('Error: Unable to write file \'' . $filename . '\'.');
         }
 
-        stream_copy_to_stream($resource, $destination);
+        $copied = stream_copy_to_stream($resource, $destination);
         fclose($destination);
+
+        if ($copied === false) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $filename . '\'.');
+        }
     }
 
     /**
@@ -368,7 +413,8 @@ class S3 extends AbstractAdapter
      */
     public function copyFileToExternal(string $sourceFile, string $externalFile): void
     {
-        $sourceFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($sourceFile);
+        $sourceFile   = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($sourceFile);
+        $externalFile = static::withS3Prefix($externalFile);
         if (!file_exists($sourceFile)) {
             throw new FileNotFoundException('Error: The file \'' . $sourceFile . '\' was not found.');
         }
@@ -386,7 +432,8 @@ class S3 extends AbstractAdapter
      */
     public function copyFileFromExternal(string $externalFile, string $destFile): void
     {
-        $destFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($destFile);
+        $destFile     = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($destFile);
+        $externalFile = static::withS3Prefix($externalFile);
         if (!file_exists($externalFile)) {
             throw new FileNotFoundException('Error: The file \'' . $externalFile . '\' was not found.');
         }
@@ -404,7 +451,8 @@ class S3 extends AbstractAdapter
      */
     public function moveFileToExternal(string $sourceFile, string $externalFile): void
     {
-        $sourceFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($sourceFile);
+        $sourceFile   = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($sourceFile);
+        $externalFile = static::withS3Prefix($externalFile);
         if (!file_exists($sourceFile)) {
             throw new FileNotFoundException('Error: The file \'' . $sourceFile . '\' was not found.');
         }
@@ -422,7 +470,8 @@ class S3 extends AbstractAdapter
      */
     public function moveFileFromExternal(string $externalFile, string $destFile): void
     {
-        $destFile = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($destFile);
+        $destFile     = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($destFile);
+        $externalFile = static::withS3Prefix($externalFile);
         if (!file_exists($externalFile)) {
             throw new FileNotFoundException('Error: The file \'' . $externalFile . '\' was not found.');
         }
@@ -657,17 +706,19 @@ class S3 extends AbstractAdapter
      */
     public function md5File(string $filename): string
     {
-        $path = $this->directory . DIRECTORY_SEPARATOR . $this->scrub($filename);
-        if (!file_exists($path)) {
-            throw new FileNotFoundException('Error: The file \'' . $path . '\' was not found.');
-        }
-
+        // HeadObject returns the same ETag as GetObject without transferring the object
+        // body, which matters a great deal on large files.
         try {
-            $fileObject = $this->client->getObject([
+            $fileObject = $this->client->headObject([
                 'Bucket' => str_replace('s3://', '', $this->baseDirectory),
                 'Key'    => str_replace($this->baseDirectory . '/', '', $this->directory . '/') . $this->scrub($filename),
             ]);
         } catch (AwsException $exception) {
+            if ($exception->getStatusCode() === 404) {
+                throw new FileNotFoundException(
+                    'Error: The file \'' . $filename . '\' was not found.', 0, $exception
+                );
+            }
             throw new UnableToReadFileException(
                 'Error: Unable to read file \'' . $filename . '\'.', 0, $exception
             );

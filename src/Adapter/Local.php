@@ -232,8 +232,12 @@ class Local extends AbstractAdapter
             throw new UnableToWriteFileException('Error: Unable to write file \'' . $filename . '\'.');
         }
 
-        stream_copy_to_stream($resource, $destination);
+        $copied = stream_copy_to_stream($resource, $destination);
         fclose($destination);
+
+        if ($copied === false) {
+            throw new UnableToWriteFileException('Error: Unable to write file \'' . $filename . '\'.');
+        }
     }
 
     /**
