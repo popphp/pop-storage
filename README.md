@@ -2,7 +2,7 @@ pop-storage
 ===========
 
 [![Build Status](https://github.com/popphp/pop-storage/workflows/phpunit/badge.svg)](https://github.com/popphp/pop-storage/actions)
-[![Coverage Status](http://cc.popphp.org/coverage.php?comp=pop-storage)](http://cc.popphp.org/pop-storage/)
+[![Coverage Status](https://cc.popphp.org/coverage.php?comp=pop-storage)](https://cc.popphp.org/pop-storage/)
 
 [![Join the chat at https://discord.gg/TZjgT74U7E](https://media.popphp.org/img/discord.svg)](https://discord.gg/TZjgT74U7E)
 
